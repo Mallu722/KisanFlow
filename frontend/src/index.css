@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+@theme {
+  --color-krishi-light: #f2f9f1;
+  --color-krishi: #4ade80;
+  --color-krishi-dark: #166534;
+}
+
+body {
+  background-color: #f9fafb; /* gray-50 */
+  color: #111827; /* gray-900 */
+}
