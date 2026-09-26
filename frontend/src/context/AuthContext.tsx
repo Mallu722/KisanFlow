@@ -7,7 +7,7 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   role: 'farmer' | 'officer' | null;
-  login: (phone: string) => Promise<void>;
+  login: (phone: string, otp: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -30,8 +30,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = useCallback(async (phone: string) => {
-    const res = await farmerApi.login({ phone });
+  const login = useCallback(async (phone: string, otp: string) => {
+    const res = await farmerApi.verifyOtp({ phone, otp });
     const { token: t, farmer: f } = res.data.data;
     localStorage.setItem('kf_token', t);
     localStorage.setItem('kf_farmer', JSON.stringify(f));

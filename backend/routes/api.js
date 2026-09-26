@@ -3,6 +3,8 @@ const router  = express.Router();
 const c       = require('../controllers/farmerController');
 
 // ─── Farmer (public) ─────────────────────────────────────────────────────────
+router.post('/farmer/send-otp',              c.sendOtp);
+router.post('/farmer/verify-otp',            c.verifyOtp);
 router.post('/farmer/login',                 c.loginFarmer);
 router.get('/centres/recommend',             c.recommendCentres);
 router.post('/slots/book',                   c.bookSlot);

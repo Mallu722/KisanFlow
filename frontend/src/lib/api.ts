@@ -47,7 +47,11 @@ export const slotsApi = {
 };
 
 export const farmerApi = {
-  login: (data: { phone: string }) => api.post<ApiResponse<{ token: string; farmer: Farmer }>>('/api/farmer/login', data),
+  sendOtp: (phone: string) => api.post<ApiResponse<null>>('/api/farmer/send-otp', { phone }),
+  verifyOtp: (data: { phone: string; otp: string }) =>
+    api.post<ApiResponse<{ token: string; farmer: Farmer }>>('/api/farmer/verify-otp', data),
+  login: (data: { phone: string; otp?: string }) =>
+    api.post<ApiResponse<{ token: string; farmer: Farmer }>>('/api/farmer/verify-otp', data),
   getProfile: (id: string) => api.get<ApiResponse<Farmer>>(`/api/farmer/${id}`),
   updateProfile: (id: string, data: Partial<Farmer>) =>
     api.put<ApiResponse<Farmer>>(`/api/farmer/${id}`, data),

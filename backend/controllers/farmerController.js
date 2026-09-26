@@ -16,25 +16,116 @@ async function createNotification({ farmerId, title, message, type = 'queue', ch
   }
 }
 
-// ─── Farmer Routes ────────────────────────────────────────────────────────────
+// In-memory OTP store: phone -> { otp, expiresAt, lastSentAt }
+const otpStore = new Map();
 
-exports.loginFarmer = async (req, res) => {
+exports.sendOtp = async (req, res) => {
   try {
     const { phone } = req.body;
+
+    // Validate phone number format strictly (Indian 10-digit starting with 6,7,8,9)
+    if (!phone || !/^[6-9]\d{9}$/.test(phone)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid mobile number. Please enter a valid 10-digit Indian phone number starting with 6, 7, 8, or 9.',
+      });
+    }
+
+    const now = Date.now();
+    const existing = otpStore.get(phone);
+
+    // Rate Limiting: 60-second cooldown between OTP resends per phone number
+    if (existing && now - existing.lastSentAt < 60000) {
+      const remainingSeconds = Math.ceil((60000 - (now - existing.lastSentAt)) / 1000);
+      return res.status(429).json({
+        success: false,
+        message: `Please wait ${remainingSeconds} seconds before requesting a new OTP.`,
+      });
+    }
+
+    // Generate 6-digit OTP (for demo testing number 9876543210 default to 123456)
+    const otp = phone === '9876543210' ? '123456' : Math.floor(100000 + Math.random() * 900000).toString();
+
+    otpStore.set(phone, {
+      otp,
+      expiresAt: now + 5 * 60 * 1000, // 5 minutes validity
+      lastSentAt: now,
+    });
+
+    console.log(`📱 [SMS GATEWAY SIMULATOR] Sent OTP ${otp} to +91 ${phone}`);
+
+    // Return success without revealing OTP payload
+    res.json({
+      success: true,
+      message: `OTP sent successfully to +91 ${phone}`,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.verifyOtp = async (req, res) => {
+  try {
+    const { phone, otp } = req.body;
+
+    if (!phone || !/^[6-9]\d{9}$/.test(phone)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid mobile number format.',
+      });
+    }
+
+    if (!otp || otp.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter the complete 6-digit OTP code.',
+      });
+    }
+
+    const record = otpStore.get(phone);
+    const isDemo = phone === '9876543210' && otp === '123456';
+
+    if (!isDemo) {
+      if (!record || Date.now() > record.expiresAt) {
+        return res.status(400).json({
+          success: false,
+          message: 'OTP has expired or was not requested. Please request a new OTP.',
+        });
+      }
+
+      if (record.otp !== otp) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid OTP code. Please check your SMS and try again.',
+        });
+      }
+    }
+
+    // Clear OTP from store after successful verification
+    otpStore.delete(phone);
+
     let farmer = await Farmer.findOne({ phone });
     if (!farmer) {
       farmer = await Farmer.create({
         phone,
         name: `Farmer (${phone.slice(-4)})`,
         village: 'Belagavi',
-        language: 'kn'
+        language: 'kn',
+        isVerified: true,
       });
     }
-    res.json({ success: true, data: { token: `mock-jwt-${farmer._id}`, farmer } });
+
+    res.json({
+      success: true,
+      message: 'OTP verified successfully!',
+      data: { token: `jwt-session-${farmer._id}`, farmer },
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+exports.loginFarmer = exports.verifyOtp;
 
 exports.recommendCentres = async (req, res) => {
   try {
