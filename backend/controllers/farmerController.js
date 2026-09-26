@@ -5,7 +5,8 @@ const Notification   = require('../models/Notification');
 const Procurement    = require('../models/Procurement');
 const Payment        = require('../models/Payment');
 const OfficerProfile = require('../models/OfficerProfile');
-const { sendSms } = require('../services/smsService');
+const mongoose       = require('mongoose');
+const { sendSms }    = require('../services/smsService');
 
 // ─── Helper to create a Notification & Dispatch SMS ───────────────────────────
 async function createNotification({ farmerId, title, message, type = 'queue', channel = 'both' }) {
