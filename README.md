@@ -263,5 +263,24 @@ npm run dev
 
 ---
 
+## 🌐 Production Deployment Guide
+
+### Option 1: Monolithic Deployment (Render / Railway)
+Deploy both Express backend and React frontend bundled together as a single service on **Render** or **Railway**:
+1. Connect your GitHub repository to [Render.com](https://render.com).
+2. Create a new **Web Service**.
+3. Set Build Command: `npm run install:all && npm run build`
+4. Set Start Command: `npm start`
+5. Add Environment Variables:
+   - `PORT`: `5000`
+   - `MONGODB_URI`: `mongodb+srv://...`
+
+### Option 2: Split Deployment (Vercel + Render)
+- **Backend**: Deploy `/backend` to Render, Railway, or AWS.
+- **Frontend**: Deploy `/frontend` to Vercel or Netlify.
+  - Set Environment Variable in Vercel: `VITE_API_URL` = `https://your-backend-api.onrender.com`
+
+---
+
 ## 📜 License & Copyright
 © 2026 **KrishiFlow** — Department of Agricultural Marketing, Govt. of Karnataka. All rights reserved.

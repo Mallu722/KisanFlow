@@ -71,7 +71,7 @@ export function Card({ children, className = '', hover, onClick }: CardProps) {
 }
 
 // ─── Badge ────────────────────────────────────────────────────────────────────
-type BadgeVariant = 'waiting' | 'called' | 'processing' | 'completed' | 'cancelled' | 'pending' | 'paid' | 'success' | 'warning' | 'danger' | 'info';
+type BadgeVariant = 'waiting' | 'called' | 'processing' | 'completed' | 'cancelled' | 'pending' | 'paid' | 'success' | 'warning' | 'danger' | 'info' | 'default';
 interface BadgeProps { variant: BadgeVariant; children: React.ReactNode; className?: string; }
 export function Badge({ variant, children, className = '' }: BadgeProps) {
   const styles: Record<BadgeVariant, string> = {
@@ -86,6 +86,7 @@ export function Badge({ variant, children, className = '' }: BadgeProps) {
     warning:    'bg-amber-50 text-amber-700 border-amber-200',
     danger:     'bg-red-50 text-red-700 border-red-200',
     info:       'bg-blue-50 text-blue-700 border-blue-200',
+    default:    'bg-gray-100 text-gray-700 border-gray-200',
   };
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${styles[variant]} ${className}`}>
@@ -148,7 +149,7 @@ export function StatCardSkeleton() {
 }
 
 // ─── EmptyState ───────────────────────────────────────────────────────────────
-interface EmptyStateProps { icon: React.ReactNode; title: string; description: string; action?: React.ReactNode; }
+interface EmptyStateProps { icon?: React.ReactNode; title: string; description: string; action?: React.ReactNode; }
 export function EmptyState({ icon, title, description, action }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4 text-center">

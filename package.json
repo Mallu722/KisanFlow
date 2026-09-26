@@ -1,0 +1,15 @@
+{
+  "name": "krishiflow-monorepo",
+  "version": "1.0.0",
+  "description": "KrishiFlow - Smart APMC Procurement & Farmer Queue Management System",
+  "scripts": {
+    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "build": "npm install --prefix frontend && npm run build --prefix frontend",
+    "start": "node backend/server.js",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend"
+  },
+  "keywords": ["apmc", "procurement", "agriculture", "farmer-queue", "dbt-payment"],
+  "author": "Department of Agricultural Marketing",
+  "license": "ISC"
+}

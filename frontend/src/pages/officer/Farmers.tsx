@@ -228,7 +228,7 @@ export default function OfficerFarmers() {
                         <div className="flex items-center gap-1.5">
                           <h3 className="font-bold text-slate-900 text-sm">{farmer.name}</h3>
                           {farmer.isVerified && (
-                            <CheckCircle2 size={14} className="text-emerald-500" title="Verified Land Record" />
+                            <span title="Verified Land Record"><CheckCircle2 size={14} className="text-emerald-500" /></span>
                           )}
                         </div>
                         <p className="text-xs text-slate-400 font-mono font-medium">{farmer.phone}</p>
