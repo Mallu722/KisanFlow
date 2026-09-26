@@ -7,7 +7,8 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   role: 'farmer' | 'officer' | null;
-  login: (phone: string, otp: string) => Promise<void>;
+  login: (email: string, password?: string) => Promise<void>;
+  signup: (data: { name: string; phone?: string; email: string; password: string; village?: string }) => Promise<void>;
   logout: () => void;
 }
 
@@ -30,8 +31,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = useCallback(async (phone: string, otp: string) => {
-    const res = await farmerApi.verifyOtp({ phone, otp });
+  const login = useCallback(async (email: string, password?: string) => {
+    const res = await farmerApi.signin({ email, password: password || 'farmer123' });
+    const { token: t, farmer: f } = res.data.data;
+    localStorage.setItem('kf_token', t);
+    localStorage.setItem('kf_farmer', JSON.stringify(f));
+    setToken(t);
+    setFarmer(f);
+  }, []);
+
+  const signup = useCallback(async (data: { name: string; phone?: string; email: string; password: string; village?: string }) => {
+    const res = await farmerApi.signup(data);
     const { token: t, farmer: f } = res.data.data;
     localStorage.setItem('kf_token', t);
     localStorage.setItem('kf_farmer', JSON.stringify(f));
@@ -55,6 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated: !!token,
         role,
         login,
+        signup,
         logout,
       }}
     >

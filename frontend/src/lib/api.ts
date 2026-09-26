@@ -17,13 +17,10 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message =
-      error.response?.data?.message ||
-      error.response?.data?.error ||
-      'Something went wrong. Please try again.';
+    const message = error.response?.data?.message || error.response?.data?.error;
 
-    // Don't toast for 401 (handled by AuthContext)
-    if (error.response?.status !== 401) {
+    // Only toast if an explicit error message was returned from API and status is not 401
+    if (message && error.response?.status !== 401) {
       toast.error(message, { id: 'api-error' });
     }
 
@@ -47,11 +44,15 @@ export const slotsApi = {
 };
 
 export const farmerApi = {
+  signup: (data: { name?: string; phone?: string; email: string; password: string; village?: string }) =>
+    api.post<ApiResponse<{ token: string; farmer: Farmer }>>('/api/farmer/signup', data),
+  signin: (data: { email: string; password: string }) =>
+    api.post<ApiResponse<{ token: string; farmer: Farmer }>>('/api/farmer/signin', data),
   sendOtp: (phone: string) => api.post<ApiResponse<null>>('/api/farmer/send-otp', { phone }),
   verifyOtp: (data: { phone: string; otp: string }) =>
     api.post<ApiResponse<{ token: string; farmer: Farmer }>>('/api/farmer/verify-otp', data),
-  login: (data: { phone: string; otp?: string }) =>
-    api.post<ApiResponse<{ token: string; farmer: Farmer }>>('/api/farmer/verify-otp', data),
+  login: (data: { phone?: string; email?: string; password?: string }) =>
+    api.post<ApiResponse<{ token: string; farmer: Farmer }>>('/api/farmer/signin', data),
   getProfile: (id: string) => api.get<ApiResponse<Farmer>>(`/api/farmer/${id}`),
   updateProfile: (id: string, data: Partial<Farmer>) =>
     api.put<ApiResponse<Farmer>>(`/api/farmer/${id}`, data),

@@ -3,9 +3,11 @@ const router  = express.Router();
 const c       = require('../controllers/farmerController');
 
 // ─── Farmer (public) ─────────────────────────────────────────────────────────
+router.post('/farmer/signup',               c.signupFarmer);
+router.post('/farmer/signin',               c.signinFarmer);
 router.post('/farmer/send-otp',              c.sendOtp);
 router.post('/farmer/verify-otp',            c.verifyOtp);
-router.post('/farmer/login',                 c.loginFarmer);
+router.post('/farmer/login',                 c.signinFarmer);
 router.get('/centres/recommend',             c.recommendCentres);
 router.post('/slots/book',                   c.bookSlot);
 router.get('/slots/active/:farmerId',        c.getActiveToken);

@@ -1,113 +1,91 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Phone, ArrowRight, ShieldCheck, Leaf, Sparkles, CheckCircle2, RefreshCw, Send, AlertCircle } from 'lucide-react';
+import { Mail, Lock, User, Phone, ArrowRight, ShieldCheck, Leaf, Sparkles, UserPlus, LogIn } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
-import { farmerApi, type ApiResponse } from '../../lib/api';
+import { type ApiResponse } from '../../lib/api';
 import { Button } from '../../components/ui';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login } = useAuth();
-  const [step, setStep] = useState<'phone' | 'otp'>('phone');
-  const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const { login, signup } = useAuth();
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [isLoading, setIsLoading] = useState(false);
-  const [resending, setResending] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
 
-  // Cooldown countdown timer for rate limiting resends
-  useEffect(() => {
-    if (cooldown <= 0) return;
-    const timer = setInterval(() => setCooldown(c => c - 1), 1000);
-    return () => clearInterval(timer);
-  }, [cooldown]);
+  // Form states
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
 
-  // Validate Indian mobile number format (starts with 6-9 and has 10 digits)
-  const isValidPhone = (num: string) => /^[6-9]\d{9}$/.test(num);
-
-  // Step 1: Send OTP to phone number
-  const handlePhoneSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!isValidPhone(phone)) {
-      toast.error('Invalid mobile number. Please enter a valid 10-digit number starting with 6, 7, 8, or 9.');
-      return;
-    }
-
+  // ⚡ One-Click Demo Login
+  const handleQuickDemo = async () => {
+    setEmail('farmer@krishiflow.com');
+    setPassword('farmer123');
     setIsLoading(true);
     try {
-      const res = await farmerApi.sendOtp(phone);
-      setIsLoading(false);
-      setStep('otp');
-      setCooldown(60);
-      setOtp(['', '', '', '', '', '']);
-      toast.success(res.data.message || `📲 OTP sent to +91 ${phone} via SMS.`);
-    } catch (err: unknown) {
-      setIsLoading(false);
-      const apiErr = err as { response?: { data?: ApiResponse<null> } };
-      const msg = apiErr.response?.data?.message || 'Failed to send OTP. Please check your network or try again.';
-      toast.error(msg);
+      await login('farmer@krishiflow.com', 'farmer123');
+      toast.success('Namaskara! Welcome to KrishiFlow 🌾');
+      navigate('/home', { replace: true });
+    } catch {
+      toast.error('Failed to log in. Please try again.');
     }
+    setIsLoading(false);
   };
 
-  // Step 2: Verify OTP and Login
-  const handleOtpSubmit = async (e: React.FormEvent) => {
+  // Sign In Handler
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    const enteredOtp = otp.join('');
-    if (enteredOtp.length < 6) {
-      toast.error('Please enter the complete 6-digit OTP received via SMS.');
+    if (!email || !email.includes('@')) {
+      toast.error('Please enter a valid email address.');
+      return;
+    }
+    if (!password) {
+      toast.error('Please enter your password.');
       return;
     }
 
     setIsLoading(true);
     try {
-      await login(phone, enteredOtp);
+      await login(email, password);
       toast.success('Namaskara! Login Successful 🌾');
       navigate('/home', { replace: true });
     } catch (err: unknown) {
       const apiErr = err as { response?: { data?: ApiResponse<null> } };
-      const msg = apiErr.response?.data?.message || 'Invalid or expired OTP code. Please try again.';
+      const msg = apiErr.response?.data?.message || 'Invalid email or password. Please try again.';
       toast.error(msg);
     }
     setIsLoading(false);
   };
 
-  const handleOtpChange = (idx: number, val: string) => {
-    if (!/^\d?$/.test(val)) return;
-    const next = [...otp];
-    next[idx] = val;
-    setOtp(next);
-    if (val && idx < 5) {
-      document.getElementById(`otp-${idx + 1}`)?.focus();
+  // Sign Up Handler
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      toast.error('Please enter your full name.');
+      return;
     }
-  };
-
-  const handleOtpKey = (idx: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !otp[idx] && idx > 0) {
-      document.getElementById(`otp-${idx - 1}`)?.focus();
+    if (!email || !email.includes('@')) {
+      toast.error('Please enter a valid email address.');
+      return;
     }
-  };
-
-  const handleResendOtp = async () => {
-    if (cooldown > 0) {
-      toast.error(`Please wait ${cooldown} seconds before requesting a new OTP.`);
+    if (!password || password.length < 4) {
+      toast.error('Password must be at least 4 characters long.');
       return;
     }
 
-    setResending(true);
+    setIsLoading(true);
     try {
-      const res = await farmerApi.sendOtp(phone);
-      setResending(false);
-      setCooldown(60);
-      toast.success(res.data.message || '📲 Fresh OTP sent to your phone via SMS.');
+      await signup({ name, phone, email, password });
+      toast.success('Account created successfully! Welcome to KrishiFlow 🌾');
+      navigate('/home', { replace: true });
     } catch (err: unknown) {
-      setResending(false);
       const apiErr = err as { response?: { data?: ApiResponse<null> } };
-      const msg = apiErr.response?.data?.message || 'Failed to resend OTP. Please try again later.';
+      const msg = apiErr.response?.data?.message || 'Failed to create account. Please try again.';
       toast.error(msg);
     }
+    setIsLoading(false);
   };
 
   return (
@@ -138,118 +116,170 @@ export default function Login() {
           </p>
         </div>
 
-        {/* Step 1: Mobile Number Input */}
+        {/* Mode Selector Tabs */}
+        <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-6 border border-slate-200">
+          <button
+            type="button"
+            onClick={() => setMode('signin')}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+              mode === 'signin'
+                ? 'bg-white text-primary-700 shadow-md shadow-slate-200'
+                : 'text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <LogIn size={14} /> Sign In
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('signup')}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+              mode === 'signup'
+                ? 'bg-white text-primary-700 shadow-md shadow-slate-200'
+                : 'text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <UserPlus size={14} /> Create Account
+          </button>
+        </div>
+
+        {/* Sign In / Sign Up Form */}
         <AnimatePresence mode="wait">
-          {step === 'phone' ? (
+          {mode === 'signin' ? (
+            /* Sign In Tab */
             <motion.form
-              key="phone-step"
+              key="signin-form"
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 10 }}
-              onSubmit={handlePhoneSubmit}
+              onSubmit={handleSignIn}
               className="space-y-4"
             >
               <div>
                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1 mb-1.5">
-                  <Phone size={13} className="text-primary-600" /> Enter Registered Mobile Number
+                  <Mail size={13} className="text-primary-600" /> Email Address
                 </label>
-                <div className="flex rounded-2xl border-2 border-slate-200 overflow-hidden bg-slate-50 focus-within:border-primary-500 focus-within:bg-white focus-within:ring-4 focus-within:ring-primary-500/10 transition-all">
-                  <div className="flex items-center px-3.5 border-r border-slate-200 bg-slate-100 font-bold text-slate-700 text-sm">
-                    🇮🇳 +91
-                  </div>
+                <div className="flex items-center rounded-2xl border-2 border-slate-200 overflow-hidden bg-slate-50 focus-within:border-primary-500 focus-within:bg-white focus-within:ring-4 focus-within:ring-primary-500/10 transition-all">
                   <input
-                    type="tel"
-                    maxLength={10}
-                    value={phone}
-                    onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
-                    placeholder="e.g. 9876543210"
-                    className="flex-1 px-4 py-3.5 text-base font-bold text-slate-900 outline-none bg-transparent tracking-wider placeholder-slate-400"
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="farmer@krishiflow.com"
+                    className="w-full px-4 py-3 text-sm font-bold text-slate-900 outline-none bg-transparent placeholder-slate-400"
                     autoFocus
                   />
                 </div>
-                {phone.length > 0 && !isValidPhone(phone) && (
-                  <p className="text-[11px] text-red-500 font-medium mt-1 flex items-center gap-1">
-                    <AlertCircle size={12} /> Mobile number must start with 6, 7, 8, or 9
-                  </p>
-                )}
               </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1 mb-1.5">
+                  <Lock size={13} className="text-primary-600" /> Password
+                </label>
+                <div className="flex items-center rounded-2xl border-2 border-slate-200 overflow-hidden bg-slate-50 focus-within:border-primary-500 focus-within:bg-white focus-within:ring-4 focus-within:ring-primary-500/10 transition-all">
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-4 py-3 text-sm font-bold text-slate-900 outline-none bg-transparent placeholder-slate-400"
+                  />
+                </div>
+              </div>
+
+              {/* Quick Demo One-Click Fill & Login */}
+              <button
+                type="button"
+                onClick={handleQuickDemo}
+                className="w-full py-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold transition-all border border-emerald-200 flex items-center justify-between shadow-sm"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-emerald-600" /> Use Demo Account:
+                </span>
+                <span className="font-mono bg-emerald-200/60 px-2 py-0.5 rounded text-emerald-900 font-extrabold">
+                  farmer@krishiflow.com / farmer123
+                </span>
+              </button>
 
               <Button
                 type="submit"
-                disabled={isLoading || !isValidPhone(phone)}
+                disabled={isLoading || !email || !password}
                 className="w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-primary-600/30 gap-2 transition-all mt-2"
               >
-                {isLoading ? 'Sending SMS OTP...' : 'Send OTP via SMS'}
-                <Send size={16} />
+                {isLoading ? 'Signing In...' : 'Sign In & Access Portal'}
+                <ArrowRight size={16} />
               </Button>
             </motion.form>
           ) : (
-            /* Step 2: 6-Digit OTP Input */
+            /* Sign Up Tab */
             <motion.form
-              key="otp-step"
+              key="signup-form"
               initial={{ opacity: 0, x: 10 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -10 }}
-              onSubmit={handleOtpSubmit}
-              className="space-y-4"
+              onSubmit={handleSignUp}
+              className="space-y-3.5"
             >
-              <div className="text-center">
-                <p className="text-xs font-bold text-slate-600">
-                  Enter 6-digit OTP sent to <span className="font-mono text-slate-900 font-extrabold">+91 {phone}</span>
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setStep('phone')}
-                  className="text-xs font-semibold text-primary-600 hover:underline mt-0.5"
-                >
-                  (Change mobile number)
-                </button>
+              <div>
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1 mb-1">
+                  <User size={13} className="text-primary-600" /> Full Name
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="e.g. Ramesh Huded"
+                  className="w-full px-4 py-2.5 text-sm font-bold text-slate-900 rounded-2xl border-2 border-slate-200 bg-slate-50 focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10 outline-none transition-all"
+                  autoFocus
+                />
               </div>
 
-              {/* 6-Digit OTP Boxes */}
-              <div className="flex justify-between gap-1.5 my-4">
-                {otp.map((digit, idx) => (
-                  <input
-                    key={idx}
-                    id={`otp-${idx}`}
-                    type="text"
-                    maxLength={1}
-                    value={digit}
-                    onChange={e => handleOtpChange(idx, e.target.value)}
-                    onKeyDown={e => handleOtpKey(idx, e)}
-                    className="w-11 sm:w-12 h-14 text-center text-xl font-black rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10 outline-none transition-all font-mono"
-                    autoFocus={idx === 0}
-                  />
-                ))}
+              <div>
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1 mb-1">
+                  <Phone size={13} className="text-primary-600" /> Mobile Number
+                </label>
+                <input
+                  type="tel"
+                  maxLength={10}
+                  value={phone}
+                  onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
+                  placeholder="9876543210"
+                  className="w-full px-4 py-2.5 text-sm font-bold text-slate-900 rounded-2xl border-2 border-slate-200 bg-slate-50 focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10 outline-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1 mb-1">
+                  <Mail size={13} className="text-primary-600" /> Email Address
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="ramesh@gmail.com"
+                  className="w-full px-4 py-2.5 text-sm font-bold text-slate-900 rounded-2xl border-2 border-slate-200 bg-slate-50 focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10 outline-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1 mb-1">
+                  <Lock size={13} className="text-primary-600" /> Create Password
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="At least 4 characters"
+                  className="w-full px-4 py-2.5 text-sm font-bold text-slate-900 rounded-2xl border-2 border-slate-200 bg-slate-50 focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10 outline-none transition-all"
+                />
               </div>
 
               <Button
                 type="submit"
-                disabled={isLoading || otp.join('').length < 6}
-                className="w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-primary-600/30 gap-2 transition-all"
+                disabled={isLoading || !name || !email || !password}
+                className="w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-primary-600/30 gap-2 transition-all mt-2"
               >
-                {isLoading ? 'Verifying OTP...' : 'Verify OTP & Enter'}
-                <CheckCircle2 size={16} />
+                {isLoading ? 'Creating Account...' : 'Create Farmer Account'}
+                <UserPlus size={16} />
               </Button>
-
-              <div className="flex items-center justify-between pt-1">
-                <button
-                  type="button"
-                  onClick={() => setStep('phone')}
-                  className="text-xs font-semibold text-slate-500 hover:text-slate-900"
-                >
-                  ← Edit Phone Number
-                </button>
-                <button
-                  type="button"
-                  onClick={handleResendOtp}
-                  disabled={resending || cooldown > 0}
-                  className="text-xs font-bold text-primary-600 hover:text-primary-700 disabled:text-slate-400 flex items-center gap-1"
-                >
-                  <RefreshCw size={12} className={resending ? 'animate-spin' : ''} />
-                  {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend OTP'}
-                </button>
-              </div>
             </motion.form>
           )}
         </AnimatePresence>

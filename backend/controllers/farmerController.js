@@ -125,7 +125,88 @@ exports.verifyOtp = async (req, res) => {
   }
 };
 
-exports.loginFarmer = exports.verifyOtp;
+exports.signupFarmer = async (req, res) => {
+  try {
+    const { name, phone, email, password, village, language } = req.body;
+
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid email address.' });
+    }
+    if (!password || password.length < 4) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 4 characters long.' });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    let existing = await Farmer.findOne({ email: cleanEmail });
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'An account with this email already exists. Please Sign In.' });
+    }
+
+    const cleanPhone = phone ? phone.replace(/\D/g, '') : `98765${Math.floor(10000 + Math.random() * 90000)}`;
+
+    const farmer = await Farmer.create({
+      email: cleanEmail,
+      password,
+      phone: cleanPhone.length === 10 ? cleanPhone : `98765${Math.floor(10000 + Math.random() * 90000)}`,
+      name: name || 'Farmer',
+      village: village || 'Belagavi',
+      language: language || 'kn',
+      isVerified: true,
+    });
+
+    res.json({
+      success: true,
+      message: 'Account created successfully! Welcome to KrishiFlow.',
+      data: { token: `jwt-session-${farmer._id}`, farmer },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.signinFarmer = async (req, res) => {
+  try {
+    const { email, password, phone } = req.body;
+
+    let searchFilter = {};
+    if (email) searchFilter = { email: email.toLowerCase().trim() };
+    else if (phone) searchFilter = { phone };
+    else searchFilter = { email: 'farmer@krishiflow.com' };
+
+    let farmer = await Farmer.findOne(searchFilter);
+
+    // Auto-create demo farmer account if email is farmer@krishiflow.com
+    if (!farmer && (email === 'farmer@krishiflow.com' || !email)) {
+      farmer = await Farmer.create({
+        email: 'farmer@krishiflow.com',
+        password: 'farmer123',
+        phone: '9876543210',
+        name: 'Ramesh Huded',
+        village: 'Bailhongal',
+        language: 'kn',
+        isVerified: true,
+      });
+    }
+
+    if (!farmer) {
+      return res.status(400).json({ success: false, message: 'No account found with this email. Please Sign Up first.' });
+    }
+
+    if (farmer.password && password && farmer.password !== password) {
+      return res.status(400).json({ success: false, message: 'Incorrect password. Please check and try again.' });
+    }
+
+    res.json({
+      success: true,
+      message: `Welcome back, ${farmer.name}!`,
+      data: { token: `jwt-session-${farmer._id}`, farmer },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.loginFarmer = exports.signinFarmer;
 
 exports.recommendCentres = async (req, res) => {
   try {
