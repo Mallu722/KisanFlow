@@ -20,14 +20,18 @@ async function sendSms({ phone, message }) {
   // 1. Twilio SMS Integration if environment variables exist
   if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
     try {
-      const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-      const res = await client.messages.create({
-        body: message,
-        from: process.env.TWILIO_PHONE_NUMBER,
-        to: formattedPhone,
-      });
-      console.log(`✅ [TWILIO SMS SENT] Message SID: ${res.sid}`);
-      return { success: true, provider: 'twilio', sid: res.sid };
+      let twilio;
+      try { twilio = require('twilio'); } catch { twilio = null; }
+      if (twilio) {
+        const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+        const res = await client.messages.create({
+          body: message,
+          from: process.env.TWILIO_PHONE_NUMBER,
+          to: formattedPhone,
+        });
+        console.log(`✅ [TWILIO SMS SENT] Message SID: ${res.sid}`);
+        return { success: true, provider: 'twilio', sid: res.sid };
+      }
     } catch (err) {
       console.error(`❌ [TWILIO SMS ERROR]:`, err.message);
     }
