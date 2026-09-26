@@ -186,44 +186,68 @@ KisanFlow/
 
 ---
 
-## ⚡ Quick Start & Local Setup
+## 📦 How to Run This Project from a ZIP File
 
-### 1. Prerequisites
-Ensure you have the following installed on your machine:
-- **Node.js** (v18.0.0 or higher)
-- **npm** (v9.0.0 or higher)
-- **Git**
+If you received this project as a **ZIP file** (`KisanFlow.zip`), follow these simple steps to run the complete product on your computer:
 
-### 2. Clone the Repository
+### 1️⃣ Step 1: Extract the ZIP File
+1. Right-click `KisanFlow.zip` and select **Extract All...** (or unzip using WinRAR/7-Zip).
+2. Open the extracted **`KisanFlow`** folder in your terminal or IDE (VS Code).
+
+### 2️⃣ Step 2: Install Prerequisites
+Ensure you have **Node.js** (v18 or higher) installed on your machine:
+- Download Node.js from [nodejs.org](https://nodejs.org) if not already installed.
+
+### 3️⃣ Step 3: Commands to Execute
+
+#### Option A: Running with Two Terminal Windows (Recommended)
+Open two terminal windows in the extracted `KisanFlow` directory:
+
+* **Terminal 1 — Backend (Express API & MongoDB Atlas)**:
+  ```bash
+  cd backend
+  npm install
+  npm run dev
+  ```
+  *(Backend will run on `http://localhost:5000` and connect automatically to MongoDB Atlas).*
+
+* **Terminal 2 — Frontend (React 18 + Vite)**:
+  ```bash
+  cd frontend
+  npm install
+  npm run dev
+  ```
+  *(Frontend Vite dev server will run on `http://localhost:5173`).*
+
+#### Option B: Unified Single-Command Setup
+From the root `KisanFlow` directory:
 ```bash
-git clone https://github.com/Mallu722/KisanFlow.git
-cd KisanFlow
+npm run install:all
+npm run start
 ```
 
-### 3. Setup & Start Backend
-```bash
-cd backend
-npm install
-```
-Ensure your `backend/.env` file is configured:
-```env
-PORT=5000
-MONGO_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/kisanflow?retryWrites=true&w=majority
-```
-Start the backend development server:
-```bash
-npm run dev
-```
-*The backend server will run on `http://localhost:5000` and automatically connect to MongoDB Atlas.*
+---
 
-### 4. Setup & Start Frontend
-Open a new terminal window:
-```bash
-cd frontend
-npm install
-npm run dev
-```
-*The frontend Vite dev server will start on `http://localhost:5173`.*
+### 4️⃣ Step 4: Step-by-Step Walkthrough to Test the Product
+
+Once both servers are running, open your web browser at **`http://localhost:5173`**:
+
+#### 🚜 Testing the Farmer Portal:
+1. Navigate to [`http://localhost:5173/login`](http://localhost:5173/login).
+2. Click **"⚡ Use Demo Account"** (Email: `farmer@krishiflow.com` / Password: `farmer123`).
+3. Click **"Book Procurement Slot"**: Select crop (e.g. Wheat), enter weight (e.g. 50 Qtl), select an APMC yard based on live load %, and click **"Confirm & Book Slot"**.
+4. View your **Live Digital Token (#101)** with wait time countdown & 4-stage queue tracker.
+5. Check **Alerts & Notifications**: Inspect real-time 15-minute advance SMS alerts & DBT payment ledger!
+
+#### 👮 Testing the Officer & APMC Admin Portal:
+1. Navigate to [`http://localhost:5173/officer/login`](http://localhost:5173/officer/login).
+2. Enter Official Credentials:
+   - **Badge ID**: `AGRI-OFF-KA-4819`
+   - **Security PIN**: `4819`
+3. **Live Overview Dashboard**: View live KPI cards, hourly token volume charts, and active queue tickers.
+4. **Live Queue Control Panel**: Click **"15-Min Alert"** to dispatch real-time SMS to the farmer, or click **"Call Next Token"** to promote tokens to Counter 1.
+5. **Produce Weighbridge Ledger**: Input gross/tare/net weight, moisture %, FAQ grade, and calculate MSP payout.
+6. **DBT Disbursement**: Click **"Release DBT"** to credit funds directly to the farmer's bank account.
 
 ---
 
@@ -231,7 +255,7 @@ npm run dev
 
 | Portal | URL | Demo Credentials |
 | :--- | :--- | :--- |
-| **Farmer Mobile & Web App** | [`http://localhost:5173/login`](http://localhost:5173/login) | **Phone**: `9876543210`<br/>**OTP**: `123456` *(Or click "⚡ Use Demo Phone")* |
+| **Farmer Mobile & Web App** | [`http://localhost:5173/login`](http://localhost:5173/login) | **Email**: `farmer@krishiflow.com`<br/>**Password**: `farmer123` *(Or click "⚡ Use Demo Account")* |
 | **Officer & APMC Admin Portal** | [`http://localhost:5173/officer/login`](http://localhost:5173/officer/login) | **Badge ID**: `AGRI-OFF-KA-4819`<br/>**Security PIN**: `4819` |
 
 ---
