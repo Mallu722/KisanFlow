@@ -210,6 +210,9 @@ export default function FarmerNotifications() {
                         <span className={`text-[10px] font-black tracking-wider uppercase px-2 py-0.5 rounded-md ${cfg.badgeColor}`}>
                           {cfg.badge}
                         </span>
+                        <span className="text-[10px] font-extrabold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md flex items-center gap-1">
+                          <Smartphone size={11} /> Real-Time SMS Dispatched
+                        </span>
                         <span className="text-xs text-slate-400 font-semibold">
                           {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(n.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                         </span>

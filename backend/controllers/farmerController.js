@@ -5,12 +5,23 @@ const Notification   = require('../models/Notification');
 const Procurement    = require('../models/Procurement');
 const Payment        = require('../models/Payment');
 const OfficerProfile = require('../models/OfficerProfile');
-const mongoose       = require('mongoose');
+const { sendSms } = require('../services/smsService');
 
-// ─── Helper to create a Notification ─────────────────────────────────────────
+// ─── Helper to create a Notification & Dispatch SMS ───────────────────────────
 async function createNotification({ farmerId, title, message, type = 'queue', channel = 'both' }) {
   try {
-    return await Notification.create({ farmerId: farmerId || null, title, message, type, channel });
+    const notif = await Notification.create({ farmerId: farmerId || null, title, message, type, channel });
+
+    // If notification is for a specific farmer, dispatch real-time SMS to their mobile number
+    if (farmerId && mongoose.Types.ObjectId.isValid(farmerId)) {
+      const farmer = await Farmer.findById(farmerId);
+      if (farmer && farmer.phone) {
+        const smsText = `🌾 KrishiFlow APMC: ${title} — ${message}`;
+        await sendSms({ phone: farmer.phone, message: smsText });
+      }
+    }
+
+    return notif;
   } catch (err) {
     console.error('Notification creation error:', err.message);
   }
@@ -255,13 +266,19 @@ exports.bookSlot = async (req, res) => {
       .populate('farmerId', 'name phone village')
       .populate('centreId', 'name district');
 
-    // Automatically send notification to the SPECIFIC farmer
+    // 1. Send Instant Confirmation Notification & SMS
     await createNotification({
       farmerId,
       title: 'Slot Booked Successfully! 🎫',
       message: `Your Token #${token.tokenNumber} for ${cropType || 'Produce'} (${quantity || 10} Qtl) at ${centre?.name || 'APMC Yard'} is confirmed. Estimated wait: ${estWait} mins.`,
       type: 'queue',
     });
+
+    // 2. Dispatch 1-Day Advance Reminder SMS to Farmer Mobile Number
+    if (farmerObj && farmerObj.phone) {
+      const oneDayReminderSms = `📅 1-Day Advance APMC Reminder: Dear ${farmerObj.name || 'Farmer'}, your procurement slot for Token #${token.tokenNumber} (${cropType || 'Produce'}, ${quantity || 10} Qtl) at ${centre?.name || 'APMC Yard'} is scheduled for tomorrow! Please keep your Aadhaar & Land records ready.`;
+      await sendSms({ phone: farmerObj.phone, message: oneDayReminderSms });
+    }
 
     res.json({ success: true, data: populated });
   } catch (err) {
@@ -523,6 +540,11 @@ exports.sendAdvanceAlert = async (req, res) => {
       type: 'alert',
       channel: 'both',
     });
+
+    if (token.farmerId && token.farmerId.phone) {
+      const advanceSmsText = `⏰ 15-Minute Advance Arrival Alert: Dear ${token.farmerId.name || 'Farmer'}, your turn for Token #${token.tokenNumber} (${token.cropType || 'Produce'}) at ${token.centreId?.name || 'APMC Yard'} is in ~15 minutes! Please proceed to Gate 2 now.`;
+      await sendSms({ phone: token.farmerId.phone, message: advanceSmsText });
+    }
 
     res.json({
       success: true,

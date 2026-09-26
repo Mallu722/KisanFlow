@@ -41,6 +41,33 @@ if (fs.existsSync(frontendDistPath)) {
   });
 }
 
+// Automated Background Scheduler: 24-Hour (1-Day) Advance Reminder SMS
+const Token = require('./models/Token');
+const { sendSms } = require('./services/smsService');
+
+setInterval(async () => {
+  try {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const startOfDay = new Date(tomorrow.setHours(0, 0, 0, 0));
+    const endOfDay = new Date(tomorrow.setHours(23, 59, 59, 999));
+
+    const upcomingTokens = await Token.find({
+      status: 'waiting',
+      createdAt: { $gte: startOfDay, $lte: endOfDay },
+    }).populate('farmerId').populate('centreId');
+
+    for (const token of upcomingTokens) {
+      if (token.farmerId && token.farmerId.phone) {
+        const smsMsg = `📅 Automated 1-Day APMC Reminder: Dear ${token.farmerId.name || 'Farmer'}, your procurement slot for Token #${token.tokenNumber} (${token.cropType}) at ${token.centreId?.name || 'APMC Yard'} is scheduled for tomorrow! Keep your documents ready.`;
+        await sendSms({ phone: token.farmerId.phone, message: smsMsg });
+      }
+    }
+  } catch (err) {
+    console.error('1-Day SMS Cron Error:', err.message);
+  }
+}, 60 * 60 * 1000); // Checks every hour
+
 // Start Server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
