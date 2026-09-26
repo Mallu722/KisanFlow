@@ -1,52 +1,99 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import { AuthProvider } from './context/AuthContext';
 import { FarmerLayout } from './components/FarmerLayout';
 import { OfficerLayout } from './components/OfficerLayout';
-import FarmerHome from './pages/farmer/Home';
-import BookSlot from './pages/farmer/BookSlot';
-import QueueStatus from './pages/farmer/QueueStatus';
-import OfficerDashboard from './pages/officer/Dashboard';
+import { Skeleton } from './components/ui';
 
-// Placeholder components
-const Placeholder = ({ title }: { title: string }) => (
-  <div className="flex items-center justify-center min-h-[50vh]">
-    <h1 className="text-2xl font-semibold text-gray-500">{title}</h1>
-  </div>
-);
+// ─── Lazy-loaded pages ────────────────────────────────────────────────────────
+const FarmerLogin = lazy(() => import('./pages/farmer/Login'));
+const FarmerHome = lazy(() => import('./pages/farmer/Home'));
+const BookSlot = lazy(() => import('./pages/farmer/BookSlot'));
+const QueueStatus = lazy(() => import('./pages/farmer/QueueStatus'));
+const ProcurementStatus = lazy(() => import('./pages/farmer/ProcurementStatus'));
+const Payments = lazy(() => import('./pages/farmer/Payments'));
+const Notifications = lazy(() => import('./pages/farmer/Notifications'));
+const Profile = lazy(() => import('./pages/farmer/Profile'));
 
-function App() {
+const OfficerLogin = lazy(() => import('./pages/officer/Login'));
+const OfficerDashboard = lazy(() => import('./pages/officer/Dashboard'));
+const OfficerFarmers = lazy(() => import('./pages/officer/Farmers'));
+const OfficerCentres = lazy(() => import('./pages/officer/Centres'));
+const OfficerQueue = lazy(() => import('./pages/officer/Queue'));
+const OfficerProcurement = lazy(() => import('./pages/officer/Procurement'));
+const OfficerPayments = lazy(() => import('./pages/officer/Payments'));
+const OfficerNotifications = lazy(() => import('./pages/officer/Notifications'));
+const OfficerReports = lazy(() => import('./pages/officer/Reports'));
+const OfficerSettings = lazy(() => import('./pages/officer/Settings'));
+
+// ─── Loading fallback ─────────────────────────────────────────────────────────
+function PageSkeleton() {
   return (
-    <Routes>
-      {/* Farmer Routes with Layout */}
-      <Route element={<FarmerLayout />}>
-        <Route path="/" element={<Navigate to="/home" replace />} />
-        <Route path="/home" element={<FarmerHome />} />
-        <Route path="/book-slot" element={<BookSlot />} />
-        <Route path="/queue-status" element={<QueueStatus />} />
-        <Route path="/procurement-status" element={<Placeholder title="Procurement Status (Coming Soon)" />} />
-        <Route path="/payments" element={<Placeholder title="Payments (Coming Soon)" />} />
-        <Route path="/notifications" element={<Placeholder title="Notifications" />} />
-        <Route path="/profile" element={<Placeholder title="Farmer Profile" />} />
-      </Route>
-
-      {/* Login without Layout */}
-      <Route path="/login" element={<Placeholder title="Farmer Login" />} />
-      <Route path="/officer/login" element={<Placeholder title="Officer Login" />} />
-
-      {/* Officer Routes with Layout */}
-      <Route element={<OfficerLayout />}>
-        <Route path="/officer" element={<Navigate to="/officer/dashboard" replace />} />
-        <Route path="/officer/dashboard" element={<OfficerDashboard />} />
-        <Route path="/officer/farmers" element={<Placeholder title="Farmers Management" />} />
-        <Route path="/officer/centres" element={<Placeholder title="Centres Management" />} />
-        <Route path="/officer/queue" element={<Placeholder title="Queue Management" />} />
-        <Route path="/officer/procurement" element={<Placeholder title="Procurement & Quality Check" />} />
-        <Route path="/officer/payments" element={<Placeholder title="Payments Dashboard" />} />
-        <Route path="/officer/notifications" element={<Placeholder title="Officer Notifications" />} />
-        <Route path="/officer/reports" element={<Placeholder title="Analytics & Reports" />} />
-        <Route path="/officer/settings" element={<Placeholder title="Settings" />} />
-      </Route>
-    </Routes>
+    <div className="p-6 max-w-5xl mx-auto space-y-4 animate-pulse">
+      <Skeleton className="h-48 w-full rounded-3xl" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Skeleton className="h-32 rounded-2xl" />
+        <Skeleton className="h-32 rounded-2xl" />
+        <Skeleton className="h-32 rounded-2xl" />
+      </div>
+      <Skeleton className="h-32 w-full rounded-2xl" />
+    </div>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <AuthProvider>
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          style: { borderRadius: '14px', fontFamily: 'Inter, sans-serif', fontSize: '14px', fontWeight: 600 },
+          success: { iconTheme: { primary: '#16a34a', secondary: '#fff' } },
+          error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
+        }}
+      />
+
+      <Suspense fallback={<PageSkeleton />}>
+        <Routes>
+          {/* Default redirect */}
+          <Route path="/" element={<Navigate to="/home" replace />} />
+
+          {/* Farmer Auth (no layout) */}
+          <Route path="/login" element={<FarmerLogin />} />
+
+          {/* Farmer App (with responsive layout) */}
+          <Route element={<FarmerLayout />}>
+            <Route path="/home" element={<FarmerHome />} />
+            <Route path="/book-slot" element={<BookSlot />} />
+            <Route path="/queue-status" element={<QueueStatus />} />
+            <Route path="/procurement-status" element={<ProcurementStatus />} />
+            <Route path="/payments" element={<Payments />} />
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/profile" element={<Profile />} />
+          </Route>
+
+          {/* Officer Gate & Auth */}
+          <Route path="/officer/login" element={<OfficerLogin />} />
+
+          {/* Officer Portal (Protected with Layout) */}
+          <Route path="/officer" element={<Navigate to="/officer/dashboard" replace />} />
+          <Route element={<OfficerLayout />}>
+            <Route path="/officer/dashboard" element={<OfficerDashboard />} />
+            <Route path="/officer/farmers" element={<OfficerFarmers />} />
+            <Route path="/officer/centres" element={<OfficerCentres />} />
+            <Route path="/officer/queue" element={<OfficerQueue />} />
+            <Route path="/officer/procurement" element={<OfficerProcurement />} />
+            <Route path="/officer/payments" element={<OfficerPayments />} />
+            <Route path="/officer/notifications" element={<OfficerNotifications />} />
+            <Route path="/officer/reports" element={<OfficerReports />} />
+            <Route path="/officer/settings" element={<OfficerSettings />} />
+          </Route>
+
+          {/* 404 */}
+          <Route path="*" element={<Navigate to="/home" replace />} />
+        </Routes>
+      </Suspense>
+    </AuthProvider>
+  );
+}

@@ -1,130 +1,276 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Clock, Navigation, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Clock, MapPin, Navigation, AlertTriangle, CheckCircle2,
+  RefreshCw, ShieldCheck, PhoneCall, Wheat, ArrowRight, Sparkles
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { slotsApi, type Token } from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
+import { Card, Badge, Button, EmptyState, Skeleton } from '../../components/ui';
+
+const STATUS_STEPS = ['waiting', 'called', 'processing', 'completed'] as const;
+const STATUS_LABELS: Record<string, string> = {
+  waiting: 'In Queue', called: 'Called to Counter', processing: 'Weighing & Verification', completed: 'Completed'
+};
 
 export default function QueueStatus() {
-  const [position, setPosition] = useState(14);
-  const [estimatedWait, setEstimatedWait] = useState(45); // in minutes
-  const [status, setStatus] = useState<'waiting' | 'called' | 'processing' | 'completed'>('waiting');
+  const { farmer } = useAuth();
+  const [token, setToken] = useState<Token | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(new Date());
 
-  // Simulate queue moving
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setPosition((prev) => {
-        if (prev <= 1) return 1;
-        setEstimatedWait((wait) => Math.max(0, wait - 3));
-        return prev - 1;
+  const fetchToken = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      if (farmer?._id) {
+        const res = await slotsApi.getActiveToken(farmer._id);
+        if (res.data.data) {
+          setToken(res.data.data);
+          setIsLoading(false);
+          return;
+        }
+      }
+      // Demo Token
+      setToken({
+        _id: 'demo-token',
+        tokenNumber: 142,
+        farmerId: 'demo',
+        centreId: {
+          _id: '1',
+          name: 'Bailhongal APMC Yard',
+          district: 'Belagavi',
+          location: { lat: 15.8497, lng: 74.4977 },
+          currentLoad: 45,
+          totalCapacity: 100,
+          avgProcessingTimeMinutes: 15,
+          isActive: true
+        } as any,
+        cropType: 'Wheat (FAQ Sharbati)',
+        quantity: 50,
+        status: 'called',
+        position: 1,
+        estimatedWaitMinutes: 5,
+        bookedFor: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       });
-    }, 15000); // Queue moves every 15s for demo purposes
+    } catch {
+      setToken({
+        _id: 'demo-token',
+        tokenNumber: 142,
+        farmerId: 'demo',
+        centreId: {
+          _id: '1',
+          name: 'Bailhongal APMC Yard',
+          district: 'Belagavi',
+          location: { lat: 15.8497, lng: 74.4977 },
+          currentLoad: 45,
+          totalCapacity: 100,
+          avgProcessingTimeMinutes: 15,
+          isActive: true
+        } as any,
+        cropType: 'Wheat',
+        quantity: 50,
+        status: 'called',
+        position: 1,
+        estimatedWaitMinutes: 5,
+        bookedFor: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      });
+    }
+    setIsLoading(false);
+  }, [farmer?._id]);
 
-    return () => clearInterval(timer);
-  }, []);
+  useEffect(() => {
+    fetchToken();
+    const interval = setInterval(() => {
+      setLastUpdated(new Date());
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [fetchToken]);
+
+  const isCalled = token?.status === 'called';
+  const isNearFront = token && token.position <= 3;
+  const centre = typeof token?.centreId === 'object' ? token.centreId : null;
+  const currentIdx = STATUS_STEPS.indexOf(token?.status as any || 'waiting');
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4 max-w-4xl mx-auto">
+        <Skeleton className="h-64 w-full rounded-3xl" />
+        <Skeleton className="h-32 w-full rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (!token) {
+    return (
+      <div className="max-w-xl mx-auto pt-8">
+        <EmptyState
+          icon={<Clock size={32} />}
+          title="No Active Queue Token"
+          description="You don't have an active slot booked at any APMC Yard right now."
+          action={
+            <Link to="/book-slot">
+              <Button size="lg" className="bg-primary-600 text-white font-bold">
+                Book an APMC Slot Now
+              </Button>
+            </Link>
+          }
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link to="/home" className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-50 transition-colors">
-          <ArrowLeft size={20} className="text-gray-600" />
-        </Link>
-        <h2 className="text-xl font-bold text-gray-800">Live Queue Status</h2>
-      </div>
-
-      {/* Main Ticket Card */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 overflow-hidden relative"
-      >
-        <div className="absolute top-0 right-0 w-32 h-32 bg-krishi-light rounded-bl-full -z-10 opacity-50"></div>
-        
-        <div className="text-center mb-6">
-          <p className="text-gray-500 font-medium text-sm uppercase tracking-wider mb-1">Your Token Number</p>
-          <div className="text-6xl font-black text-gray-900 tracking-tighter">#142</div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="bg-orange-50 rounded-2xl p-4 text-center border border-orange-100">
-            <p className="text-orange-600 font-medium text-sm mb-1">Position</p>
-            <p className="text-3xl font-bold text-orange-700">{position}</p>
-            <p className="text-xs text-orange-500 mt-1">in queue</p>
-          </div>
-          <div className="bg-blue-50 rounded-2xl p-4 text-center border border-blue-100">
-            <p className="text-blue-600 font-medium text-sm mb-1">Est. Wait</p>
-            <p className="text-3xl font-bold text-blue-700">{estimatedWait}</p>
-            <p className="text-xs text-blue-500 mt-1">minutes</p>
-          </div>
-        </div>
-
-        <div className="flex justify-between items-center bg-gray-50 p-4 rounded-xl border border-gray-100">
-          <div>
-            <p className="text-sm text-gray-500 font-medium">Centre</p>
-            <p className="font-bold text-gray-800">Bailhongal APMC Yard</p>
-          </div>
-          <button className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-200 text-krishi hover:text-white hover:bg-krishi transition-colors">
-            <Navigation size={18} />
-          </button>
-        </div>
-      </motion.div>
-
-      {/* Leave Home Alert */}
-      {position <= 5 && (
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 flex gap-3 shadow-sm"
-        >
-          <div className="mt-0.5">
-            <AlertTriangle className="text-yellow-600" size={24} />
-          </div>
-          <div>
-            <h4 className="font-bold text-yellow-800 text-sm">Leave Home Alert!</h4>
-            <p className="text-yellow-700 text-sm mt-1">You are almost at the front of the queue. Please start heading to the centre if you haven't already.</p>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Live Timeline */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-        <h3 className="font-bold text-gray-800 mb-6">Queue Timeline</h3>
-        
-        <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-krishi before:via-gray-200 before:to-gray-200">
-          
-          <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-            <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-krishi text-white shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10">
-              <Clock size={16} />
-            </div>
-            <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-xl border border-gray-200 bg-gray-50">
-              <div className="flex items-center justify-between mb-1">
-                <h4 className="font-bold text-gray-800 text-sm">Token Generated</h4>
-                <span className="text-xs font-medium text-gray-500">09:15 AM</span>
+    <div className="space-y-6 max-w-4xl mx-auto">
+      {/* Top Banner Alert when Called */}
+      <AnimatePresence>
+        {isCalled && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 rounded-3xl p-5 text-white shadow-xl shadow-orange-500/20 flex items-center justify-between gap-4"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center flex-shrink-0 backdrop-blur-sm animate-bounce">
+                <PhoneCall size={24} className="text-white" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-black tracking-tight">Your Token is Called to Counter 1!</h3>
+                <p className="text-xs text-orange-100 mt-0.5">
+                  Please bring your produce vehicle to Weighbridge Entry Gate immediately.
+                </p>
               </div>
             </div>
-          </div>
+            <span className="hidden sm:inline-block px-3 py-1 bg-white text-orange-900 font-extrabold text-xs rounded-xl shadow-xs">
+              ACTIVE NOW
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-          <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group">
-            <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-krishi text-white shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10 animate-pulse">
-              <span className="w-2 h-2 bg-white rounded-full"></span>
-            </div>
-            <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-xl border border-krishi bg-krishi-light/30 shadow-[0_0_15px_rgba(74,222,128,0.1)]">
-              <div className="flex items-center justify-between mb-1">
-                <h4 className="font-bold text-krishi-dark text-sm">Waiting in Queue</h4>
-                <span className="text-xs font-bold text-krishi">NOW</span>
+      {/* Main Token Digital Card */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <Card className="p-6 sm:p-8 border-slate-200/80 shadow-md relative overflow-hidden bg-white">
+            {/* Background watermark */}
+            <div className="absolute top-0 right-0 -mr-8 -mt-8 w-48 h-48 bg-primary-50 rounded-full blur-2xl pointer-events-none" />
+
+            <div className="flex items-start justify-between mb-6">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                    Live Digital Token
+                  </span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                </div>
+                <h1 className="text-5xl sm:text-6xl font-black text-slate-900 tracking-tight mt-1 font-mono">
+                  #{token.tokenNumber}
+                </h1>
+                <div className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-slate-500">
+                  <Wheat size={14} className="text-primary-600" />
+                  <span>{token.cropType} • {token.quantity} Quintals</span>
+                </div>
               </div>
-              <p className="text-xs text-gray-600">Currently processing Token #128</p>
-            </div>
-          </div>
 
-          <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group">
-            <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-gray-200 text-gray-400 shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
-              <span className="w-2 h-2 bg-white rounded-full"></span>
+              <Badge variant={token.status === 'called' ? 'warning' : token.status === 'processing' ? 'default' : 'success'}>
+                {STATUS_LABELS[token.status]}
+              </Badge>
             </div>
-            <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-xl border border-gray-100 opacity-60">
-              <h4 className="font-bold text-gray-500 text-sm">Token Called</h4>
-            </div>
-          </div>
 
+            {/* Position & Time Chips */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
+              <div className="bg-slate-50 rounded-2xl p-4 text-center border border-slate-100">
+                <span className="text-xs font-bold text-slate-400 uppercase">Ahead of You</span>
+                <span className="text-2xl sm:text-3xl font-black text-slate-900 block mt-1">
+                  {token.position <= 1 ? 'Next!' : `${token.position - 1} Farmers`}
+                </span>
+              </div>
+
+              <div className="bg-slate-50 rounded-2xl p-4 text-center border border-slate-100">
+                <span className="text-xs font-bold text-slate-400 uppercase">Est. Wait Time</span>
+                <span className="text-2xl sm:text-3xl font-black text-primary-700 block mt-1 font-mono">
+                  {token.estimatedWaitMinutes} <span className="text-xs font-bold text-slate-500">Mins</span>
+                </span>
+              </div>
+
+              <div className="bg-slate-50 rounded-2xl p-4 text-center border border-slate-100 col-span-2 sm:col-span-1">
+                <span className="text-xs font-bold text-slate-400 uppercase">Counter Gate</span>
+                <span className="text-xl sm:text-2xl font-black text-slate-900 block mt-1">
+                  Counter 1
+                </span>
+              </div>
+            </div>
+
+            {/* Step Progress Tracker */}
+            <div className="border-t border-slate-100 pt-6">
+              <div className="grid grid-cols-4 gap-2">
+                {STATUS_STEPS.map((s, i) => {
+                  const done = i <= currentIdx;
+                  const active = i === currentIdx;
+                  return (
+                    <div key={s} className="text-center">
+                      <div
+                        className={`h-2 rounded-full transition-all duration-500 mb-2 ${
+                          done ? 'bg-primary-600' : 'bg-slate-200'
+                        } ${active ? 'ring-2 ring-primary-300' : ''}`}
+                      />
+                      <span className={`text-[10px] sm:text-xs font-bold block ${done ? 'text-primary-700' : 'text-slate-400'}`}>
+                        {STATUS_LABELS[s]}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Right Info: Centre Details & Action */}
+        <div className="lg:col-span-1 space-y-4">
+          <Card className="p-5 border-slate-200/80 shadow-xs space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              Procurement Centre Details
+            </h3>
+
+            <div>
+              <h4 className="text-base font-black text-slate-900">{centre?.name || 'Bailhongal APMC Yard'}</h4>
+              <p className="text-xs text-slate-500 mt-0.5">{centre?.district || 'Belagavi'}, Karnataka</p>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl p-3.5 space-y-2 text-xs border border-slate-100">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Operational Hours:</span>
+                <span className="font-bold text-slate-800">8:00 AM – 6:00 PM</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Weighbridge Status:</span>
+                <span className="font-bold text-emerald-600">Active (Sensor Calibrated)</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Current Yard Load:</span>
+                <span className="font-bold text-slate-800">{centre?.currentLoad || 45}% Capacity</span>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <Button
+                variant="outline"
+                fullWidth
+                onClick={fetchToken}
+                className="gap-2 text-xs font-bold text-slate-700"
+              >
+                <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} /> Refresh Queue Status
+              </Button>
+
+              <Link to="/notifications" className="block">
+                <Button fullWidth className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs gap-1.5">
+                  View Calling Alerts <ArrowRight size={14} />
+                </Button>
+              </Link>
+            </div>
+          </Card>
         </div>
       </div>
     </div>

@@ -1,113 +1,228 @@
-import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Map, ListOrdered, PackageCheck, Wallet, Bell, FileText, Settings, LogOut } from 'lucide-react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { useState, useEffect } from 'react';
+import { Outlet, NavLink, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import {
+  LayoutDashboard, Users, Map, ListOrdered, PackageCheck,
+  Wallet, Bell, FileText, Settings, LogOut, Menu, X, ChevronLeft, Shield
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
 
-export function OfficerLayout() {
-  const location = useLocation();
+const NAV = [
+  { name: 'Dashboard',    path: '/officer/dashboard',     icon: LayoutDashboard },
+  { name: 'Farmers',      path: '/officer/farmers',       icon: Users },
+  { name: 'Centres',      path: '/officer/centres',       icon: Map },
+  { name: 'Queue',        path: '/officer/queue',         icon: ListOrdered },
+  { name: 'Procurement',  path: '/officer/procurement',   icon: PackageCheck },
+  { name: 'Payments',     path: '/officer/payments',      icon: Wallet },
+  { name: 'Notifications',path: '/officer/notifications', icon: Bell },
+  { name: 'Reports',      path: '/officer/reports',       icon: FileText },
+  { name: 'Settings',     path: '/officer/settings',      icon: Settings },
+];
 
-  const navItems = [
-    { name: 'Dashboard', path: '/officer/dashboard', icon: LayoutDashboard },
-    { name: 'Farmers', path: '/officer/farmers', icon: Users },
-    { name: 'Centres', path: '/officer/centres', icon: Map },
-    { name: 'Queue', path: '/officer/queue', icon: ListOrdered },
-    { name: 'Procurement', path: '/officer/procurement', icon: PackageCheck },
-    { name: 'Payments', path: '/officer/payments', icon: Wallet },
-    { name: 'Notifications', path: '/officer/notifications', icon: Bell },
-    { name: 'Reports', path: '/officer/reports', icon: FileText },
-    { name: 'Settings', path: '/officer/settings', icon: Settings },
-  ];
+function SidebarContent({
+  collapsed,
+  onClose,
+  onLogout
+}: {
+  collapsed?: boolean;
+  onClose?: () => void;
+  onLogout?: () => void;
+}) {
+  const location  = useLocation();
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      {/* Sidebar (Desktop) */}
-      <aside className="w-64 bg-[#0a2540] text-white hidden md:flex flex-col shadow-xl z-20">
-        <div className="p-6 flex items-center gap-3 border-b border-white/10">
-          <div className="w-8 h-8 bg-krishi rounded-lg flex items-center justify-center shadow-sm">
-            <span className="text-white font-bold text-lg leading-none">K</span>
-          </div>
-          <h1 className="text-xl font-bold tracking-tight text-white">Krishi<span className="text-krishi">Flow</span></h1>
+    <div className="flex flex-col h-full bg-slate-900 text-white select-none">
+      {/* Logo */}
+      <div className={`flex items-center gap-3 border-b border-slate-800 ${collapsed ? 'p-3 justify-center' : 'p-4'}`}>
+        <div className="w-10 h-10 bg-gradient-to-tr from-primary-600 to-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-primary-900/40 flex-shrink-0">
+          <span className="text-white font-black text-lg leading-none">K</span>
         </div>
-        
-        <div className="px-6 py-4 border-b border-white/10">
-          <p className="text-xs text-blue-200 uppercase font-semibold tracking-wider mb-1">Officer Portal</p>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-green-400"></div>
-            <p className="text-sm font-medium">Bailhongal APMC</p>
+        {!collapsed && (
+          <div className="flex-1 min-w-0">
+            <h1 className="font-black text-white text-base leading-none">Krishi<span className="text-primary-400">Flow</span></h1>
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <p className="text-[10px] text-slate-400 font-bold tracking-wider uppercase">Officer Portal</p>
+            </div>
           </div>
-        </div>
-
-        <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname.startsWith(item.path);
-            return (
-              <Link
-                key={item.name}
-                to={item.path}
-                className={twMerge(
-                  clsx(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-                    isActive ? "bg-krishi/20 text-krishi-light border-l-4 border-krishi" : "text-gray-300 hover:bg-white/5 hover:text-white"
-                  )
-                )}
-              >
-                <Icon size={18} />
-                {item.name}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="p-4 border-t border-white/10">
-          <button className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-medium text-gray-300 hover:bg-red-500/20 hover:text-red-300 transition-all">
-            <LogOut size={18} />
-            Sign Out
+        )}
+        {onClose && (
+          <button onClick={onClose} className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
+            <X size={16} />
           </button>
+        )}
+      </div>
+
+      {/* Centre Location Badge */}
+      {!collapsed && (
+        <div className="px-4 py-3 border-b border-slate-800 bg-slate-950/40">
+          <div className="flex items-center gap-2">
+            <Shield size={14} className="text-primary-400 flex-shrink-0" />
+            <div className="min-w-0">
+              <span className="text-xs text-white font-bold block truncate">Bailhongal APMC Yard</span>
+              <span className="text-[10px] text-slate-400 block truncate">Belagavi Division</span>
+            </div>
+          </div>
         </div>
+      )}
+
+      {/* Navigation List */}
+      <nav className={`flex-1 overflow-y-auto py-3 ${collapsed ? 'px-2' : 'px-3'} space-y-1`}>
+        {NAV.map(({ name, path, icon: Icon }) => {
+          const isActive = location.pathname.startsWith(path);
+          return (
+            <NavLink
+              key={name}
+              to={path}
+              onClick={onClose}
+              title={collapsed ? name : undefined}
+              className={`flex items-center rounded-xl transition-all duration-150 group text-xs font-bold
+                ${collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'}
+                ${isActive
+                  ? 'bg-primary-600/20 text-primary-300 border border-primary-500/30 shadow-sm'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                }`}
+            >
+              <Icon size={17} className={`flex-shrink-0 ${isActive ? 'text-primary-400' : 'text-slate-400 group-hover:text-white'}`} />
+              {!collapsed && <span>{name}</span>}
+            </NavLink>
+          );
+        })}
+      </nav>
+
+      {/* Footer / Officer Sign Out */}
+      <div className={`p-3 border-t border-slate-800 bg-slate-950/40 ${collapsed ? 'flex justify-center' : ''}`}>
+        {!collapsed ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2.5 px-2">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-primary-600 to-emerald-500 text-white flex items-center justify-center font-bold text-xs shadow">
+                A
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-white truncate">Dr. Anand Patil</p>
+                <p className="text-[10px] text-slate-400 font-mono truncate">AGRI-OFF-KA-4819</p>
+              </div>
+            </div>
+            <button
+              onClick={onLogout}
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-xl text-xs font-bold transition-colors"
+            >
+              <LogOut size={13} />
+              <span>Lock / Sign Out</span>
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={onLogout}
+            title="Lock Portal"
+            className="p-2 text-red-400 hover:bg-red-500/10 rounded-xl transition-colors"
+          >
+            <LogOut size={16} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function OfficerLayout() {
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [time, setTime] = useState(new Date());
+  const navigate = useNavigate();
+
+  // Authentication Guard: Check if officer session exists
+  const officerSessionRaw = localStorage.getItem('krishiflow_officer_session');
+  if (!officerSessionRaw) {
+    return <Navigate to="/officer/login" replace />;
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('krishiflow_officer_session');
+    toast.success('Officer session locked successfully');
+    navigate('/officer/login', { replace: true });
+  };
+
+  return (
+    <div className="flex h-screen bg-slate-100 overflow-hidden font-sans">
+      {/* Desktop Sidebar */}
+      <aside
+        className={`hidden md:flex flex-col flex-shrink-0 transition-all duration-200 z-30 shadow-xl ${
+          collapsed ? 'w-16' : 'w-60'
+        }`}
+      >
+        <SidebarContent collapsed={collapsed} onLogout={handleLogout} />
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-        {/* Mobile Header */}
-        <header className="md:hidden bg-[#0a2540] text-white p-4 flex items-center justify-between sticky top-0 z-50 shadow-md">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-krishi rounded flex items-center justify-center">
-              <span className="text-white font-bold text-sm leading-none">K</span>
+      {/* Mobile Drawer */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMobileOpen(false)}
+              className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
+            />
+            <motion.aside
+              initial={{ x: -280 }}
+              animate={{ x: 0 }}
+              exit={{ x: -280 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="fixed inset-y-0 left-0 w-64 z-50 md:hidden shadow-2xl"
+            >
+              <SidebarContent onClose={() => setMobileOpen(false)} onLogout={handleLogout} />
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Top Header */}
+        <header className="bg-white border-b border-slate-200 px-4 md:px-6 py-3 flex items-center justify-between flex-shrink-0 z-20 shadow-sm">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="md:hidden p-2 hover:bg-slate-100 rounded-xl text-slate-600 transition-colors"
+            >
+              <Menu size={20} />
+            </button>
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="hidden md:flex p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors"
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              <ChevronLeft size={18} className={`transition-transform duration-200 ${collapsed ? 'rotate-180' : ''}`} />
+            </button>
+            <div className="hidden sm:block">
+              <span className="text-xs font-bold text-slate-800">KrishiFlow APMC Management System</span>
+              <span className="text-[10px] text-slate-400 font-semibold block">Govt. Procurement Gateway • v2.4</span>
             </div>
-            <h1 className="text-lg font-bold">KrishiFlow Officer</h1>
           </div>
-          <button><LayoutDashboard size={20} /></button>
+
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 font-mono font-semibold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors"
+            >
+              <LogOut size={13} />
+              <span className="hidden sm:inline">Lock Portal</span>
+            </button>
+          </div>
         </header>
 
-        {/* Top bar (Desktop) */}
-        <header className="hidden md:flex items-center justify-between bg-white px-8 py-4 border-b border-gray-200 sticky top-0 z-10">
-          <h2 className="text-2xl font-bold text-gray-800 tracking-tight">
-            {navItems.find(i => location.pathname.startsWith(i.path))?.name || 'Dashboard'}
-          </h2>
-          <div className="flex items-center gap-4">
-            <div className="relative">
-               <Bell className="text-gray-400 hover:text-krishi cursor-pointer transition-colors" size={20} />
-               <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
-            </div>
-            <div className="h-8 w-px bg-gray-200"></div>
-            <div className="flex items-center gap-3 cursor-pointer">
-              <div className="text-right hidden lg:block">
-                <p className="text-sm font-bold text-gray-700 leading-tight">Arjun Kumar</p>
-                <p className="text-xs text-gray-500 font-medium">Duty Officer</p>
-              </div>
-              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold border-2 border-white shadow-sm">
-                AK
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* Page Content */}
-        <div className="flex-1 overflow-auto p-4 md:p-8 bg-gray-50/50">
+        {/* Scrollable Page Outlet */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-slate-50">
           <Outlet />
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

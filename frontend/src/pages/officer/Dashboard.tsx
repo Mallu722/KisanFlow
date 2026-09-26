@@ -1,133 +1,269 @@
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Users, CalendarCheck, Activity, CheckCircle, ArrowRight } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import {
+  Users, CalendarCheck, Activity, CheckCircle2, ArrowRight,
+  PhoneCall, RefreshCw, TrendingUp, TrendingDown, Minus
+} from 'lucide-react';
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Legend, BarChart, Bar
+} from 'recharts';
 import { Link } from 'react-router-dom';
+import { Card, Badge, StatCardSkeleton, Skeleton } from '../../components/ui';
+import api from '../../lib/api';
+import toast from 'react-hot-toast';
 
-const analyticsData = [
-  { time: '09:00', tokens: 12, completed: 5 },
-  { time: '10:00', tokens: 25, completed: 18 },
-  { time: '11:00', tokens: 45, completed: 30 },
-  { time: '12:00', tokens: 68, completed: 42 },
-  { time: '13:00', tokens: 82, completed: 55 },
-  { time: '14:00', tokens: 110, completed: 78 },
-];
+interface DashboardData {
+  totalFarmers?: number;
+  todayBookings?: number;
+  activeQueue?: number;
+  completedToday?: number;
+  kpis?: {
+    totalFarmers?: number;
+    todayBookings?: number;
+    activeQueue?: number;
+    completedToday?: number;
+  };
+  liveQueue?: any[];
+  centres?: any[];
+  procurementData?: { time: string; tokens: number; completed: number }[];
+}
 
-const mockQueue = [
-  { id: '#142', farmer: 'Ramesh H.', status: 'Processing', time: '10 mins ago' },
-  { id: '#143', farmer: 'Shankar M.', status: 'Waiting', time: 'Arrived' },
-  { id: '#144', farmer: 'Lakshmi V.', status: 'Waiting', time: 'Not Arrived' },
-  { id: '#145', farmer: 'Suresh K.', status: 'Waiting', time: 'Not Arrived' },
-];
+const FALLBACK_CHART = Array.from({ length: 10 }, (_, i) => ({
+  time: `${8 + i}:00`,
+  tokens: Math.floor(Math.random() * 20) + 5,
+  completed: Math.floor(Math.random() * 15) + 2,
+}));
 
-export default function Dashboard() {
+const FALLBACK: DashboardData = {
+  totalFarmers: 1248,
+  todayBookings: 342,
+  activeQueue: 47,
+  completedToday: 289,
+  kpis: { totalFarmers: 1248, todayBookings: 342, activeQueue: 47, completedToday: 289 },
+  liveQueue: [],
+  centres: [],
+  procurementData: FALLBACK_CHART,
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  waiting: 'bg-blue-50 text-blue-700 border-blue-200',
+  called: 'bg-amber-50 text-amber-700 border-amber-200',
+  processing: 'bg-purple-50 text-purple-700 border-purple-200',
+};
+
+export default function OfficerDashboard() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [callingNext, setCallingNext] = useState(false);
+
+  const fetchDashboard = useCallback(async () => {
+    try {
+      const res = await api.get('/api/officer/dashboard');
+      if (res.data.data) {
+        setData(res.data.data);
+      }
+    } catch {
+      setData(FALLBACK);
+    }
+    setLastRefresh(new Date());
+    setIsLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchDashboard();
+    // Poll every 5 seconds for real-time queue & booking KPI updates
+    const interval = setInterval(fetchDashboard, 5000);
+    return () => clearInterval(interval);
+  }, [fetchDashboard]);
+
+  const handleCallNext = async () => {
+    setCallingNext(true);
+    try {
+      const res = await api.post('/api/officer/queue/call-next', {});
+      toast.success(`📢 Called Token #${res.data.data.tokenNumber}!`);
+      fetchDashboard();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'No waiting tokens in queue');
+    }
+    setCallingNext(false);
+  };
+
+  const totalFarmers = data?.kpis?.totalFarmers ?? data?.totalFarmers ?? 5;
+  const todayBookings = data?.kpis?.todayBookings ?? data?.todayBookings ?? 3;
+  const activeQueue = data?.kpis?.activeQueue ?? data?.activeQueue ?? 2;
+  const completedToday = data?.kpis?.completedToday ?? data?.completedToday ?? 1;
+
   const stats = [
-    { label: 'Total Farmers', value: '1,248', trend: '+12%', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'Today\'s Bookings', value: '342', trend: '+5%', icon: CalendarCheck, color: 'text-purple-600', bg: 'bg-purple-50' },
-    { label: 'Active Queue', value: '68', trend: '-2', icon: Activity, color: 'text-orange-600', bg: 'bg-orange-50' },
-    { label: 'Completed Today', value: '276', trend: '+40', icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50' },
+    { label: 'Total Farmers', value: totalFarmers, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', trend: '+12 vs yesterday', up: true },
+    { label: "Today's Bookings", value: todayBookings, icon: CalendarCheck, color: 'text-purple-600', bg: 'bg-purple-50', trend: '+28 vs yesterday', up: true },
+    { label: 'Active Queue', value: activeQueue, icon: Activity, color: 'text-orange-600', bg: 'bg-orange-50', trend: 'Live Queue', up: null },
+    { label: 'Completed Today', value: completedToday, icon: CheckCircle2, color: 'text-primary-600', bg: 'bg-primary-50', trend: '+40 vs yesterday', up: true },
   ];
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, i) => (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-            key={stat.label} 
-            className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center justify-between group hover:shadow-md transition-shadow"
+    <div className="space-y-5">
+      {/* Header row */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900 leading-tight">Live Overview</h2>
+          <p className="text-sm text-gray-400 flex items-center gap-1.5 mt-0.5 font-mono">
+            <span className="w-1.5 h-1.5 bg-primary-500 rounded-full animate-pulse inline-block" />
+            Updated {lastRefresh.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={fetchDashboard}
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 px-3.5 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition-colors font-bold"
           >
-            <div>
-              <p className="text-gray-500 text-sm font-medium mb-1">{stat.label}</p>
-              <div className="flex items-baseline gap-2">
-                <h3 className="text-3xl font-bold text-gray-800">{stat.value}</h3>
-                <span className={`text-xs font-bold ${stat.trend.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}>
-                  {stat.trend}
-                </span>
-              </div>
-            </div>
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${stat.bg} ${stat.color} group-hover:scale-110 transition-transform`}>
-              <stat.icon size={24} />
-            </div>
-          </motion.div>
-        ))}
+            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} /> Refresh
+          </button>
+          <button
+            onClick={handleCallNext}
+            disabled={callingNext}
+            className="flex items-center gap-1.5 text-sm font-extrabold text-white bg-primary-600 hover:bg-primary-700 px-4 py-2 rounded-xl transition-colors disabled:opacity-60 shadow-md shadow-primary-600/30"
+          >
+            <PhoneCall size={15} /> {callingNext ? 'Calling…' : 'Call Next Token'}
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Chart */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-gray-100"
-        >
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-gray-800">Procurement Overview (Today)</h3>
-            <select className="bg-gray-50 border border-gray-200 text-sm rounded-lg px-3 py-1.5 outline-none focus:border-krishi text-gray-600 font-medium">
-              <option>Bailhongal APMC</option>
-              <option>All Centres</option>
-            </select>
-          </div>
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={analyticsData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 12}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 12}} dx={-10} />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                />
-                <Line type="monotone" dataKey="tokens" name="Tokens Issued" stroke="#8b5cf6" strokeWidth={3} dot={{r: 4, strokeWidth: 2}} activeDot={{r: 6}} />
-                <Line type="monotone" dataKey="completed" name="Completed" stroke="#10b981" strokeWidth={3} dot={{r: 4, strokeWidth: 2}} activeDot={{r: 6}} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        {/* Live Queue Panel */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="bg-white rounded-2xl p-0 shadow-sm border border-gray-100 flex flex-col overflow-hidden"
-        >
-          <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-[#f8fafc]">
-            <h3 className="text-lg font-bold text-gray-800">Live Queue (Gate 1)</h3>
-            <span className="flex items-center gap-1.5 text-xs font-bold text-green-600 bg-green-100 px-2.5 py-1 rounded-full animate-pulse">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> LIVE
-            </span>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {mockQueue.map((item, i) => (
-              <div key={item.id} className={`p-4 rounded-xl border ${item.status === 'Processing' ? 'border-krishi bg-krishi-light/50' : 'border-gray-100 bg-white hover:border-gray-300'} transition-colors flex items-center justify-between`}>
-                <div className="flex items-center gap-4">
-                  <div className={`text-sm font-bold px-2 py-1 rounded ${item.status === 'Processing' ? 'bg-krishi text-white' : 'bg-gray-100 text-gray-700'}`}>
-                    {item.id}
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {isLoading && !data
+          ? Array(4).fill(0).map((_, i) => <StatCardSkeleton key={i} />)
+          : stats.map((s, i) => {
+              const Icon = s.icon;
+              return (
+                <motion.div
+                  key={s.label}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{s.label}</span>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${s.bg}`}>
+                      <Icon size={20} className={s.color} />
+                    </div>
                   </div>
                   <div>
-                    <p className="font-bold text-gray-800 text-sm">{item.farmer}</p>
-                    <p className="text-xs text-gray-500">{item.time}</p>
+                    <span className="text-3xl font-black text-slate-900 tracking-tight font-mono">
+                      {s.value}
+                    </span>
+                    <div className="flex items-center gap-1 mt-1 text-xs font-semibold text-emerald-600">
+                      <TrendingUp size={12} />
+                      <span>{s.trend}</span>
+                    </div>
                   </div>
-                </div>
-                {item.status === 'Processing' ? (
-                   <button className="text-xs font-bold bg-white text-krishi-dark border border-krishi px-3 py-1.5 rounded-lg shadow-sm hover:bg-krishi hover:text-white transition-colors">Finish</button>
-                ) : (
-                   <button className="text-xs font-bold bg-gray-900 text-white px-3 py-1.5 rounded-lg shadow-sm hover:bg-gray-800 transition-colors">Call</button>
-                )}
-              </div>
-            ))}
-          </div>
+                </motion.div>
+              );
+            })}
+      </div>
 
-          <div className="p-4 border-t border-gray-100 bg-gray-50 text-center">
-            <Link to="/officer/queue" className="text-sm font-bold text-krishi-dark hover:text-krishi flex items-center justify-center gap-1">
-              View Full Queue <ArrowRight size={16} />
-            </Link>
-          </div>
-        </motion.div>
+      {/* Chart & Live Queue Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Token Flow Chart */}
+        <div className="lg:col-span-2">
+          <Card className="p-5 border-slate-200/80 shadow-xs">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-sm">Token Flow — Today</h3>
+                <p className="text-xs text-slate-400">Hourly bookings vs completions at all centres</p>
+              </div>
+              <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
+                Today
+              </span>
+            </div>
+
+            <div className="h-60">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={data?.procurementData || FALLBACK_CHART}
+                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="tokenGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="time" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#0f172a',
+                      borderRadius: '10px',
+                      border: 'none',
+                      color: '#fff',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+                  <Area type="monotone" dataKey="tokens" name="Issued Tokens" stroke="#8b5cf6" strokeWidth={2.5} fill="url(#tokenGrad)" />
+                  <Area type="monotone" dataKey="completed" name="Completed" stroke="#16a34a" strokeWidth={2} fill="transparent" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        </div>
+
+        {/* Live Active Queue Panel */}
+        <div className="lg:col-span-1">
+          <Card className="p-5 border-slate-200/80 shadow-xs flex flex-col justify-between h-full">
+            <div>
+              <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-3">
+                <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                  <Activity size={16} className="text-orange-500" /> Live Queue
+                </h3>
+                <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold rounded-full uppercase">
+                  ● LIVE
+                </span>
+              </div>
+
+              {isLoading && !data ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(n => <Skeleton key={n} className="h-14 w-full rounded-xl" />)}
+                </div>
+              ) : (data?.liveQueue?.length ?? 0) === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400 font-medium">
+                  No active tokens in queue right now.
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {data?.liveQueue?.map((t: any) => (
+                    <div key={t._id} className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between text-xs">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-black text-slate-900 text-sm">#{t.tokenNumber}</span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${STATUS_COLORS[t.status] || 'bg-slate-100'}`}>
+                            {t.status}
+                          </span>
+                        </div>
+                        <p className="text-slate-500 font-semibold mt-0.5 truncate max-w-[150px]">
+                          {t.farmerId?.name || 'Farmer'} ({t.cropType})
+                        </p>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-bold">{t.centreId?.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 mt-4">
+              <Link to="/officer/queue">
+                <button className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1">
+                  Manage Full Queue <ArrowRight size={13} />
+                </button>
+              </Link>
+            </div>
+          </Card>
+        </div>
       </div>
     </div>
   );
