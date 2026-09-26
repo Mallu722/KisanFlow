@@ -8,6 +8,7 @@ const FarmerSchema = new mongoose.Schema({
   village: { type: String, default: 'Belagavi' },
   isVerified: { type: Boolean, default: true },
   language: { type: String, default: 'kn' },
+  smsOptIn: { type: Boolean, default: true },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Farmer', FarmerSchema);

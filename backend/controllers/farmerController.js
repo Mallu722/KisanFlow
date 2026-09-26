@@ -8,17 +8,43 @@ const OfficerProfile = require('../models/OfficerProfile');
 const mongoose       = require('mongoose');
 const { sendSms }    = require('../services/smsService');
 
-// ─── Helper to create a Notification & Dispatch SMS ───────────────────────────
-async function createNotification({ farmerId, title, message, type = 'queue', channel = 'both' }) {
-  try {
-    const notif = await Notification.create({ farmerId: farmerId || null, title, message, type, channel });
+const SmsDeliveryLog = require('../models/SmsDeliveryLog');
 
-    // If notification is for a specific farmer, dispatch real-time SMS to their mobile number
-    if (farmerId && mongoose.Types.ObjectId.isValid(farmerId)) {
-      const farmer = await Farmer.findById(farmerId);
-      if (farmer && farmer.phone) {
-        const smsText = `🌾 KrishiFlow APMC: ${title} — ${message}`;
-        await sendSms({ phone: farmer.phone, message: smsText });
+const CRITICAL_TYPES = ['token_update', 'leave_home_alert', 'payment_status_updated', 'centre_closed', 'alert'];
+
+// ─── Helper to create a Notification & Dispatch SMS with Consent & Log Checks ──
+async function createNotification({ farmerId, title, message, type = 'token_update', channel = null, templateId = null, isUrgent = false }) {
+  try {
+    const isCritical = isUrgent || CRITICAL_TYPES.includes(type);
+    const deliveryChannel = channel || (isCritical ? 'both' : 'push');
+
+    const notif = await Notification.create({
+      farmerId: farmerId || null,
+      title,
+      message,
+      type,
+      deliveryChannel,
+      isCritical,
+      templateId,
+    });
+
+    // Check if SMS delivery is required ('sms' or 'both')
+    if (deliveryChannel === 'sms' || deliveryChannel === 'both') {
+      if (farmerId && mongoose.Types.ObjectId.isValid(farmerId)) {
+        const farmer = await Farmer.findById(farmerId);
+        // Respect farmer SMS consent (smsOptIn defaults to true)
+        if (farmer && farmer.phone && farmer.smsOptIn !== false) {
+          const smsText = `🌾 KrishiFlow APMC: ${title} — ${message}`;
+          await sendSms({
+            phone: farmer.phone,
+            message: smsText,
+            templateId,
+            notificationId: notif._id,
+            farmerId: farmer._id,
+          });
+        } else {
+          console.log(`ℹ️ [SMS SKIPPED] Farmer ${farmer?.name || farmerId} has opted out of SMS notifications (smsOptIn: false).`);
+        }
       }
     }
 
@@ -996,6 +1022,57 @@ exports.updateOfficerProfile = async (req, res) => {
       profile = await OfficerProfile.findByIdAndUpdate(profile._id, { $set: req.body, updatedAt: new Date() }, { returnDocument: 'after' });
     }
     res.json({ success: true, data: profile, message: 'Officer profile & preferences updated successfully!' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Rate-limit tracker for Officer SMS Broadcasts: centreId -> lastSentTimestamp
+const broadcastRateLimitMap = new Map();
+
+exports.sendOfficerSmsAnnouncement = async (req, res) => {
+  try {
+    const { centreId, message, title = '📢 Urgent APMC Announcement', templateId = null } = req.body;
+    const now = Date.now();
+    const centreKey = centreId || 'all_centres';
+    const lastSent = broadcastRateLimitMap.get(centreKey) || 0;
+
+    // Rate Limit Enforcer: Max 1 SMS broadcast per centre per hour
+    if (now - lastSent < 60 * 60 * 1000) {
+      const remainingMins = Math.ceil((60 * 60 * 1000 - (now - lastSent)) / (60 * 1000));
+      return res.status(429).json({
+        success: false,
+        message: `SMS Rate Limit Reached: Please wait ${remainingMins} minutes before broadcasting another SMS announcement to this APMC centre.`,
+      });
+    }
+
+    // Find all farmers with active tokens at this centre
+    const filter = centreId && centreId !== 'all' ? { centreId, status: { $in: ['waiting', 'called', 'processing'] } } : { status: { $in: ['waiting', 'called', 'processing'] } };
+    const activeTokens = await Token.find(filter).populate('farmerId');
+    const farmers = activeTokens.map(t => t.farmerId).filter(f => f && f.phone && f.smsOptIn !== false);
+
+    // Update rate limit timestamp
+    broadcastRateLimitMap.set(centreKey, now);
+
+    let sentCount = 0;
+    for (const farmer of farmers) {
+      await createNotification({
+        farmerId: farmer._id,
+        title,
+        message,
+        type: 'centre_closed',
+        channel: 'both',
+        isUrgent: true,
+        templateId,
+      });
+      sentCount++;
+    }
+
+    res.json({
+      success: true,
+      message: `Urgent SMS Announcement broadcasted to ${sentCount} farmers with active tokens!`,
+      sentCount,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

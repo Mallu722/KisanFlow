@@ -43,6 +43,7 @@ router.post('/officer/payments/:paymentId/disburse', c.disbursePayment);
 // Notifications & Broadcast
 router.get('/officer/notifications',                 c.getOfficerNotifications);
 router.post('/officer/notifications/send',           c.sendOfficerNotification);
+router.post('/officer/notifications/send-sms',       c.sendOfficerSmsAnnouncement);
 
 // Analytics & Reports
 router.get('/officer/reports',                       c.getAnalyticsReports);
