@@ -10,7 +10,64 @@ const { sendSms }    = require('../services/smsService');
 
 const SmsDeliveryLog = require('../models/SmsDeliveryLog');
 
-const CRITICAL_TYPES = ['token_update', 'leave_home_alert', 'payment_status_updated', 'centre_closed', 'alert'];
+// Critical types automatically get SMS + push delivery (channel: 'both')
+// 'queue' and 'procurement' added so officer token actions always SMS the farmer
+const CRITICAL_TYPES = ['token_update', 'leave_home_alert', 'payment_status_updated', 'centre_closed', 'alert', 'queue', 'procurement'];
+
+// ─── SSE (Server-Sent Events) Broadcaster ────────────────────────────────────
+// Holds all connected farmer SSE clients: Map<clientId, res>
+const sseClients = new Map();
+let sseClientId = 0;
+
+/**
+ * Broadcast a queue-update event to all connected SSE clients.
+ * Payload: { type, token, message }
+ */
+function broadcastQueueEvent(payload) {
+  const data = `data: ${JSON.stringify(payload)}\n\n`;
+  console.log(`📡 [SSE BROADCAST] ${payload.type} → ${sseClients.size} client(s) | Token #${payload.token?.tokenNumber || '?'}`);
+  for (const [id, res] of sseClients) {
+    try {
+      res.write(data);
+    } catch (e) {
+      sseClients.delete(id);
+    }
+  }
+}
+
+/**
+ * SSE Endpoint: GET /api/queue/events
+ * Farmers connect here to receive live queue push updates.
+ */
+exports.queueSSE = (req, res) => {
+  const clientId = ++sseClientId;
+
+  // SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // disable nginx buffering
+  res.flushHeaders();
+
+  // Send a welcome ping immediately so client knows connection is alive
+  res.write(`data: ${JSON.stringify({ type: 'connected', message: 'SSE connected', clientId })}\n\n`);
+
+  // Register client
+  sseClients.set(clientId, res);
+  console.log(`📡 [SSE] Client #${clientId} connected. Total: ${sseClients.size}`);
+
+  // Keep-alive heartbeat every 25s (prevents proxy/browser timeouts)
+  const heartbeat = setInterval(() => {
+    try { res.write(`: heartbeat\n\n`); } catch { clearInterval(heartbeat); }
+  }, 25000);
+
+  // Cleanup on disconnect
+  req.on('close', () => {
+    sseClients.delete(clientId);
+    clearInterval(heartbeat);
+    console.log(`📡 [SSE] Client #${clientId} disconnected. Total: ${sseClients.size}`);
+  });
+};
 
 // ─── Helper to create a Notification & Dispatch SMS with Consent & Log Checks ──
 async function createNotification({ farmerId, title, message, type = 'token_update', channel = null, templateId = null, isUrgent = false }) {
@@ -90,9 +147,14 @@ exports.sendOtp = async (req, res) => {
       lastSentAt: now,
     });
 
-    console.log(`📱 [SMS GATEWAY SIMULATOR] Sent OTP ${otp} to +91 ${phone}`);
+    // Dispatch real OTP SMS via configured gateway (MSG91 / Twilio / Simulator)
+    await sendSms({
+      phone,
+      message: `🌾 KrishiFlow APMC: Your OTP for login is ${otp}. Valid for 5 minutes. Do not share this with anyone. -KRHFLW`,
+      templateId: process.env.MSG91_OTP_TEMPLATE_ID || null,
+    });
 
-    // Return success without revealing OTP payload
+    // Return success without revealing OTP in response
     res.json({
       success: true,
       message: `OTP sent successfully to +91 ${phone}`,
@@ -543,6 +605,21 @@ exports.callNextToken = async (req, res) => {
       title: '📢 Your Token is Called!',
       message: `Token #${nextToken.tokenNumber}: Please proceed immediately to Verification Counter 1 at ${nextToken.centreId?.name || 'APMC Yard'}.`,
       type: 'queue',
+      channel: 'both',   // force SMS + push for this urgent event
+      isUrgent: true,
+    });
+
+    // 📡 Broadcast real-time SSE event to all connected farmer dashboards
+    broadcastQueueEvent({
+      type: 'token_called',
+      token: {
+        _id:          nextToken._id,
+        tokenNumber:  nextToken.tokenNumber,
+        status:       'called',
+        farmerId:     nextToken.farmerId?._id,
+        centreId:     nextToken.centreId?._id,
+      },
+      message: `Token #${nextToken.tokenNumber} has been called to counter!`,
     });
 
     res.json({ success: true, data: nextToken, message: `Token #${nextToken.tokenNumber} is now Called!` });
@@ -619,13 +696,30 @@ exports.updateTokenStatus = async (req, res) => {
     }
 
     if (notifTitle && token.farmerId) {
+      // Determine urgency: 'called', 'completed', 'cancelled' are high-priority → SMS + push
+      const urgentStatuses = ['called', 'completed', 'cancelled'];
       await createNotification({
         farmerId: token.farmerId._id,
         title: notifTitle,
         message: notifMsg,
         type: status === 'completed' ? 'procurement' : 'queue',
+        channel: urgentStatuses.includes(status) ? 'both' : 'push',
+        isUrgent: urgentStatuses.includes(status),
       });
     }
+
+    // 📡 Broadcast real-time SSE event to all connected farmer dashboards
+    broadcastQueueEvent({
+      type: `token_${status}`,
+      token: {
+        _id:         token._id,
+        tokenNumber: token.tokenNumber,
+        status,
+        farmerId:    token.farmerId?._id,
+        centreId:    token.centreId?._id,
+      },
+      message: notifMsg || `Token #${token.tokenNumber} updated to ${status}`,
+    });
 
     res.json({ success: true, data: token });
   } catch (err) {

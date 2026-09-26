@@ -15,6 +15,10 @@ router.get('/farmer/notifications/:farmerId',c.getFarmerNotifications);
 router.get('/farmer/payments/:farmerId',     c.getFarmerPayments);
 router.get('/farmer/procurements/:farmerId', c.getFarmerProcurements);
 
+// ─── Real-Time Queue SSE (Server-Sent Events) ─────────────────────────────────
+// Farmer dashboards subscribe here to instantly receive officer queue changes
+router.get('/queue/events',                  c.queueSSE);
+
 // ─── Officer / Admin ─────────────────────────────────────────────────────────
 router.get('/officer/dashboard',                     c.getDashboard);
 router.get('/officer/queue',                         c.getQueue);
