@@ -1,5 +1,3 @@
-const axios = require('axios');
-
 /**
  * Real-Time SMS Gateway Dispatcher for KrishiFlow
  * Dispatches real SMS notifications to farmer mobile numbers via Twilio, Fast2SMS, or SMS Webhooks.
@@ -38,18 +36,41 @@ async function sendSms({ phone, message }) {
   // 2. Fast2SMS Integration if FAST2SMS_API_KEY environment variable exists
   if (process.env.FAST2SMS_API_KEY && cleanPhone.length === 10) {
     try {
-      const res = await axios.post('https://www.fast2sms.com/dev/bulkV2', {
-        route: 'v3',
-        sender_id: 'TXTIND',
-        message: message,
-        language: 'english',
-        flash: 0,
-        numbers: cleanPhone,
-      }, {
-        headers: { authorization: process.env.FAST2SMS_API_KEY }
-      });
-      console.log(`✅ [FAST2SMS SENT] Response:`, res.data);
-      return { success: true, provider: 'fast2sms', data: res.data };
+      let axios;
+      try { axios = require('axios'); } catch { axios = null; }
+
+      if (axios) {
+        const res = await axios.post('https://www.fast2sms.com/dev/bulkV2', {
+          route: 'v3',
+          sender_id: 'TXTIND',
+          message: message,
+          language: 'english',
+          flash: 0,
+          numbers: cleanPhone,
+        }, {
+          headers: { authorization: process.env.FAST2SMS_API_KEY }
+        });
+        console.log(`✅ [FAST2SMS SENT] Response:`, res.data);
+      } else {
+        const res = await fetch('https://www.fast2sms.com/dev/bulkV2', {
+          method: 'POST',
+          headers: {
+            'authorization': process.env.FAST2SMS_API_KEY,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            route: 'v3',
+            sender_id: 'TXTIND',
+            message: message,
+            language: 'english',
+            flash: 0,
+            numbers: cleanPhone,
+          }),
+        });
+        const data = await res.json();
+        console.log(`✅ [FAST2SMS SENT] Response:`, data);
+      }
+      return { success: true, provider: 'fast2sms' };
     } catch (err) {
       console.error(`❌ [FAST2SMS ERROR]:`, err.message);
     }
