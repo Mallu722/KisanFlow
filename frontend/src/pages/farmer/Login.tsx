@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Phone, ArrowRight, ShieldCheck, Leaf, Sparkles, CheckCircle2, Lock, KeyRound, RefreshCw } from 'lucide-react';
+import { Phone, ArrowRight, ShieldCheck, Leaf, Sparkles, CheckCircle2, KeyRound, RefreshCw, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
@@ -11,41 +11,63 @@ export default function Login() {
   const { login } = useAuth();
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState(['1', '2', '3', '4', '5', '6']);
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [generatedOtp, setGeneratedOtp] = useState('123456');
   const [isLoading, setIsLoading] = useState(false);
   const [resending, setResending] = useState(false);
 
-  // Quick Demo Auto-Fill
-  const handleQuickDemo = () => {
+  // ⚡ Quick Demo Auto-Fill (Phone + OTP ready)
+  const handleQuickDemo = async () => {
     setPhone('9876543210');
-    toast.success('Demo mobile number filled!');
+    setGeneratedOtp('123456');
+    setOtp(['1', '2', '3', '4', '5', '6']);
+    setIsLoading(true);
+    await new Promise(r => setTimeout(r, 400));
+    setIsLoading(false);
+    setStep('otp');
+    toast.success('📲 SMS Sent! OTP: 123456', { duration: 5000, icon: '🔑' });
   };
 
+  // Step 1: Submit Phone Number & Send OTP
   const handlePhoneSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (phone.length < 10) {
-      toast.error('Please enter a valid 10-digit mobile number');
+      toast.error('Please enter a valid 10-digit Indian mobile number');
       return;
     }
+
     setIsLoading(true);
-    await new Promise(r => setTimeout(r, 600)); // Simulating OTP transmission
+    await new Promise(r => setTimeout(r, 600)); // Simulating SMS Gateway API
+    const newOtp = phone === '9876543210' ? '123456' : Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(newOtp);
+    setOtp(['', '', '', '', '', '']);
     setIsLoading(false);
     setStep('otp');
-    toast.success(`OTP sent to +91 ${phone}`);
+
+    toast.success(`📲 SMS Sent to +91 ${phone}! Your OTP is ${newOtp}`, {
+      duration: 6000,
+      icon: '🔑',
+    });
   };
 
+  // Step 2: Verify OTP & Complete Login
   const handleOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const enteredOtp = otp.join('');
     if (enteredOtp.length < 6) {
-      toast.error('Please enter the 6-digit OTP code');
+      toast.error('Please enter all 6 digits of the OTP code');
+      return;
+    }
+
+    if (enteredOtp !== generatedOtp && enteredOtp !== '123456') {
+      toast.error(`Invalid OTP! Please enter ${generatedOtp}`);
       return;
     }
 
     setIsLoading(true);
     try {
       await login(phone || '9876543210');
-      toast.success('Namaskara! Welcome to KrishiFlow 🌾');
+      toast.success('Namaskara! Login Successful 🌾');
       navigate('/home', { replace: true });
     } catch {
       toast.error('Failed to log in. Please try again.');
@@ -69,11 +91,18 @@ export default function Login() {
     }
   };
 
+  const handleAutoFillOtp = () => {
+    setOtp(generatedOtp.split(''));
+    toast.success(`OTP ${generatedOtp} Auto-Filled!`);
+  };
+
   const handleResendOtp = () => {
     setResending(true);
     setTimeout(() => {
+      const freshOtp = phone === '9876543210' ? '123456' : Math.floor(100000 + Math.random() * 900000).toString();
+      setGeneratedOtp(freshOtp);
       setResending(false);
-      toast.success('New OTP sent: 123456');
+      toast.success(`📲 Fresh OTP sent: ${freshOtp}`, { icon: '🔑', duration: 5000 });
     }, 600);
   };
 
@@ -105,7 +134,7 @@ export default function Login() {
           </p>
         </div>
 
-        {/* Step 1: Phone Number */}
+        {/* Step 1: Phone Number Entry */}
         <AnimatePresence mode="wait">
           {step === 'phone' ? (
             <motion.form
@@ -129,34 +158,38 @@ export default function Login() {
                     maxLength={10}
                     value={phone}
                     onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
-                    placeholder="9876543210"
+                    placeholder="Enter 10-digit number"
                     className="flex-1 px-4 py-3.5 text-base font-bold text-slate-900 outline-none bg-transparent tracking-wider placeholder-slate-400"
                     autoFocus
                   />
                 </div>
               </div>
 
-              {/* Quick Demo One-Click Button */}
+              {/* Quick Demo One-Click Fill & Send */}
               <button
                 type="button"
                 onClick={handleQuickDemo}
-                className="w-full py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold transition-all border border-emerald-200 flex items-center justify-center gap-1.5"
+                className="w-full py-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold transition-all border border-emerald-200 flex items-center justify-between shadow-sm"
               >
-                <span>⚡ Use Demo Phone:</span>
-                <span className="font-mono text-emerald-900">98765 43210</span>
+                <span className="flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-emerald-600" /> Use Demo Credentials:
+                </span>
+                <span className="font-mono bg-emerald-200/60 px-2 py-0.5 rounded text-emerald-900 font-extrabold">
+                  98765 43210 (OTP: 123456)
+                </span>
               </button>
 
               <Button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || phone.length < 10}
                 className="w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-primary-600/30 gap-2 transition-all mt-2"
               >
-                {isLoading ? 'Sending SMS OTP...' : 'Send Login OTP'}
-                <ArrowRight size={16} />
+                {isLoading ? 'Sending OTP SMS...' : 'Send Login OTP'}
+                <Send size={16} />
               </Button>
             </motion.form>
           ) : (
-            /* Step 2: OTP Verification */
+            /* Step 2: 6-Digit OTP Verification */
             <motion.form
               key="otp-step"
               initial={{ opacity: 0, x: 10 }}
@@ -172,15 +205,35 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => setStep('phone')}
-                    className="text-primary-600 hover:underline ml-1"
+                    className="text-primary-600 hover:underline ml-1 font-semibold"
                   >
                     (Edit)
                   </button>
                 </div>
               </div>
 
+              {/* 📲 Simulated SMS Notification Banner */}
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 text-amber-900">
+                  <KeyRound size={16} className="text-amber-600 shrink-0" />
+                  <div>
+                    <p className="font-bold">Generated Demo OTP SMS</p>
+                    <p className="font-mono font-extrabold text-amber-900 text-sm tracking-wider">
+                      {generatedOtp}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAutoFillOtp}
+                  className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-[11px] transition-all shadow-sm"
+                >
+                  ⚡ Auto-Fill
+                </button>
+              </div>
+
               {/* 6-Digit OTP Box Inputs */}
-              <div className="flex justify-between gap-2 my-4">
+              <div className="flex justify-between gap-1.5 my-4">
                 {otp.map((digit, idx) => (
                   <input
                     key={idx}
@@ -190,17 +243,9 @@ export default function Login() {
                     value={digit}
                     onChange={e => handleOtpChange(idx, e.target.value)}
                     onKeyDown={e => handleOtpKey(idx, e)}
-                    className="w-12 h-14 text-center text-xl font-black rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10 outline-none transition-all font-mono"
+                    className="w-11 sm:w-12 h-14 text-center text-xl font-black rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10 outline-none transition-all font-mono"
                   />
                 ))}
-              </div>
-
-              {/* Demo Hint */}
-              <div className="bg-slate-100 rounded-xl p-2.5 text-center text-xs text-slate-600 flex items-center justify-between">
-                <span className="flex items-center gap-1 font-semibold">
-                  <KeyRound size={13} className="text-primary-600" /> Default Demo OTP:
-                </span>
-                <span className="font-mono font-bold text-primary-700">123456</span>
               </div>
 
               <Button
@@ -208,7 +253,7 @@ export default function Login() {
                 disabled={isLoading}
                 className="w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-primary-600/30 gap-2 transition-all"
               >
-                {isLoading ? 'Verifying...' : 'Verify & Enter Dashboard'}
+                {isLoading ? 'Verifying OTP...' : 'Verify & Enter Dashboard'}
                 <CheckCircle2 size={16} />
               </Button>
 
@@ -218,7 +263,7 @@ export default function Login() {
                   onClick={() => setStep('phone')}
                   className="text-xs font-semibold text-slate-500 hover:text-slate-900"
                 >
-                  ← Change Number
+                  ← Change Mobile Number
                 </button>
                 <button
                   type="button"
